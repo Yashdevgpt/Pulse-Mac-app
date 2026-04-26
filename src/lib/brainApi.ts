@@ -1,6 +1,8 @@
 import { auth } from '@/lib/firebase';
+import { toast } from 'sonner';
 import type { AppUser, BrainCard, BrainChat, DSP, Log, LogFile, Tag } from '@/lib/db';
 import { extractKnowledgeFile } from '@/features/brain/file-extraction';
+import { consumeFallbackToastSlot, getAiKeys } from '@/lib/aiKeys';
 
 export type BrainChatMode = 'work' | 'work_web' | 'web';
 
@@ -55,18 +57,33 @@ const getIdToken = async () => {
 
 const callBrainApi = async <T>(path: string, body: Record<string, unknown>) => {
   const token = await getIdToken();
+  const { geminiKey, openrouterKey } = getAiKeys();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+  if (geminiKey) headers['x-gemini-key'] = geminiKey;
+  if (openrouterKey) headers['x-openrouter-key'] = openrouterKey;
+
   const response = await fetch(path, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
     body: JSON.stringify(body),
   });
   const result = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    if (response.status === 412 && result?.error) {
+      // Server signalled missing AI keys.
+      throw new Error(`${result.error} Open Admin → AI Keys to set them.`);
+    }
     throw new Error(result.error || 'Brain memory request failed.');
+  }
+
+  if (response.headers.get('x-provider-used') === 'openrouter' && consumeFallbackToastSlot()) {
+    toast.message('Switched to OpenRouter', {
+      description: 'Gemini was rate-limited. Falling back to gpt-5-nano for now.',
+    });
   }
 
   return result as T;
