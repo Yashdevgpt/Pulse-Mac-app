@@ -55,7 +55,7 @@ export default function Layout() {
           isMobileNavOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b-4 border-black bg-[var(--color-neo-yellow)] px-6">
+        <div className="app-drag flex h-16 items-center justify-between border-b-4 border-black bg-[var(--color-neo-yellow)] px-6 lg:pl-20">
           <div className="flex items-center">
             <Activity className="mr-3 h-8 w-8 text-black stroke-[3]" />
             <span className="text-2xl font-black uppercase tracking-tight text-black">Pulse</span>
@@ -63,7 +63,7 @@ export default function Layout() {
           <Button
             variant="ghost"
             size="icon-sm"
-            className="neo-btn bg-transparent lg:hidden"
+            className="app-no-drag neo-btn bg-transparent lg:hidden"
             onClick={() => setIsMobileNavOpen(false)}
             aria-label="Close navigation"
           >
@@ -125,12 +125,12 @@ export default function Layout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col lg:min-h-0">
-        <header className="sticky top-0 z-20 border-b-4 border-black bg-[var(--color-neo-surface)] lg:hidden">
+        <header className="app-drag sticky top-0 z-20 border-b-4 border-black bg-[var(--color-neo-surface)] lg:hidden">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <Button
               variant="ghost"
               size="icon"
-              className="neo-btn bg-[var(--color-neo-surface)]"
+              className="app-no-drag neo-btn bg-[var(--color-neo-surface)]"
               onClick={() => setIsMobileNavOpen(true)}
               aria-label="Open navigation"
             >
@@ -140,7 +140,7 @@ export default function Layout() {
               <Activity className="h-5 w-5 flex-shrink-0 text-black stroke-[3]" />
               <span className="truncate text-sm font-black uppercase tracking-tight text-black">Pulse</span>
             </div>
-            <ThemeToggle showLabel={false} className="px-2.5" />
+            <ThemeToggle showLabel={false} className="app-no-drag px-2.5" />
           </div>
         </header>
 

@@ -300,3 +300,16 @@ textarea:-webkit-autofill:focus {
   transition: background-color 9999s ease-in-out 0s;
   caret-color: var(--color-neo-text);
 }
+
+/* Electron-only drag regions. macOS frameless windows (titleBarStyle:
+   'hiddenInset') need explicit drag handles since the OS no longer draws
+   a title bar. Any element with .app-drag becomes a window-drag handle;
+   nested interactive controls must opt out with .app-no-drag or they
+   cannot be clicked. These properties are no-ops in plain browsers. */
+.app-drag {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
