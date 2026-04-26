@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Pulse-yellow neo-brutalist tile with thick black border. -->
+  <rect x="3" y="3" width="58" height="58" rx="10" fill="#ffc900" stroke="#000" stroke-width="4"/>
+  <!-- Bold "P" letterform built from primitives so it renders identically on
+       every browser without depending on system fonts. -->
+  <!-- Vertical stem of the P. -->
+  <rect x="20" y="14" width="9" height="38" fill="#000"/>
+  <!-- Bowl: outer black D-shape ... -->
+  <path d="M29 14 L40 14 A12 12 0 0 1 40 38 L29 38 Z" fill="#000"/>
+  <!-- ... with the inner counter punched back to yellow. -->
+  <path d="M29 21 L39 21 A5 5 0 0 1 39 31 L29 31 Z" fill="#ffc900"/>
+  <!-- Tiny heartbeat accent at the foot — a nod to the Pulse name without
+       fighting the letterform for visual weight. -->
+  <path d="M14 56 L20 56 L23 50 L26 58 L29 54 L34 54"
+        stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

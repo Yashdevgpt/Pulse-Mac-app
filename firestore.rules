@@ -1,0 +1,109 @@
+// Firestore security rules for Pulse.
+// Deploy via Firebase console (Build → Firestore Database → Rules) or:
+//   firebase deploy --only firestore:rules
+//
+// These rules enforce server-side authorization for every collection. The Admin
+// panel UI in the client only succeeds because the rules engine (running on
+// Google's Firestore servers) recognizes the requester as an admin.
+//
+// IMPORTANT: the bootstrap admin email is hardcoded in isBootstrapAdmin() below
+// and must match VITE_BOOTSTRAP_ADMIN_EMAIL in your environment. If you change
+// one, change the other.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helpers ────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    // Bootstrap admin: must be the configured email AND the email must be
+    // verified by Firebase Auth. The regex is case-insensitive so a user
+    // who signs in as "Sagargpt23@gmail.com" still resolves correctly.
+    function isBootstrapAdmin() {
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.matches('(?i)^sagargpt23@gmail\\.com$');
+    }
+    function requesterStatus() {
+      return get(/databases/$(database)/documents/app_users/$(request.auth.uid)).data.status;
+    }
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/app_users/$(request.auth.uid)) &&
+        requesterStatus() == 'admin';
+    }
+    // The owner of a /users/{uid}/... document tree may only read/write it
+    // once their access has been approved. Pending and rejected users are
+    // blocked at the rules layer, not just by the AuthWrapper UI.
+    function isApprovedStatus(uid) {
+      return exists(/databases/$(database)/documents/app_users/$(uid))
+        && get(/databases/$(database)/documents/app_users/$(uid)).data.status == 'approved';
+    }
+
+    // ─── app_users (RBAC + waitlist) ────────────────────────────────
+    match /app_users/{uid} {
+      // Each user reads their own profile at sign-in. Admins read anyone.
+      allow get: if isOwner(uid) || isAdmin();
+
+      // Only admins can list the entire users collection (Admin panel).
+      allow list: if isAdmin();
+
+      // Auto-create on first sign-in. New users start as 'pending'; the
+      // bootstrap admin email may seed itself as 'admin' (only when their
+      // email is verified, see isBootstrapAdmin).
+      allow create: if isOwner(uid) &&
+        request.resource.data.uid == uid &&
+        (
+          request.resource.data.status == 'pending' ||
+          (request.resource.data.status == 'admin' && isBootstrapAdmin())
+        );
+
+      // Update rules:
+      //   • Admins may change anything.
+      //   • Bootstrap admin may self-elevate to 'admin' (preserves the
+      //     existing onLogin auto-promotion). Cannot change uid/createdAt.
+      //   • A regular owner may only update non-privileged fields
+      //     (e.g. their display name). They cannot edit status/uid/
+      //     email/createdAt.
+      allow update: if
+        isAdmin() ||
+        (
+          isOwner(uid) && isBootstrapAdmin() &&
+          request.resource.data.status == 'admin' &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'createdAt'])
+        ) ||
+        (
+          isOwner(uid) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'uid', 'email', 'createdAt'])
+        );
+
+      // Only admins can hard-delete a user (the cascading deleteUser flow).
+      // Admins cannot delete themselves — prevents accidental self-lockout
+      // and protects the audit trail.
+      allow delete: if isAdmin() && uid != request.auth.uid;
+    }
+
+    // ─── Per-user app data ──────────────────────────────────────────
+    // Covers /users/{uid}/dsps, /logs, /tags, /brainCards, /brainChats,
+    // /preferences/* and any future subcollection.
+    //
+    // Owners reach their own data only when their access status is
+    // 'approved' (so pending/rejected users cannot bypass the UI by
+    // calling Firestore directly). Admins always have access — their
+    // status is 'admin', not 'approved', so the isAdmin() branch is
+    // what permits them through.
+    match /users/{uid}/{document=**} {
+      allow read, write: if (isOwner(uid) && isApprovedStatus(uid)) || isAdmin();
+    }
+
+    // Default deny everything else.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
