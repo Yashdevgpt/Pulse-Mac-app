@@ -3,8 +3,9 @@ import { db, AppUser } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Check, X, ShieldAlert, Shield, ShieldOff, Edit2, Save, Trash2 } from 'lucide-react';
+import { Check, X, ShieldAlert, Shield, ShieldOff, Edit2, Save, Trash2, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { auth } from '@/lib/firebase';
+import { getAiKeys, setAiKeys, clearAiKeys } from '@/lib/aiKeys';
 
 export default function Admin() {
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -12,10 +13,35 @@ export default function Admin() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [geminiKeyInput, setGeminiKeyInput] = useState('');
+  const [openrouterKeyInput, setOpenrouterKeyInput] = useState('');
+  const [showGemini, setShowGemini] = useState(false);
+  const [showOpenrouter, setShowOpenrouter] = useState(false);
+  const [keysSavedAt, setKeysSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
     loadUsers();
+    const stored = getAiKeys();
+    setGeminiKeyInput(stored.geminiKey);
+    setOpenrouterKeyInput(stored.openrouterKey);
   }, []);
+
+  const handleSaveKeys = () => {
+    setAiKeys({ geminiKey: geminiKeyInput, openrouterKey: openrouterKeyInput });
+    setKeysSavedAt(Date.now());
+    toast.success('AI keys saved on this device');
+  };
+
+  const handleClearKeys = () => {
+    clearAiKeys();
+    setGeminiKeyInput('');
+    setOpenrouterKeyInput('');
+    setKeysSavedAt(null);
+    toast.message('AI keys cleared');
+  };
+
+  const maskedHint = (value: string) =>
+    value ? `Saved (${value.length} chars, ends ${value.slice(-4)})` : 'Not set';
 
   const loadUsers = async () => {
     try {
@@ -102,6 +128,80 @@ export default function Admin() {
         <div>
           <h1 className="text-4xl font-black text-black tracking-tight uppercase">Admin Panel</h1>
           <p className="text-zinc-600 mt-1 font-medium">Manage user access to Pulse.</p>
+        </div>
+      </div>
+
+      <div className="neo-box p-6 bg-white space-y-5 mb-8">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-[var(--color-neo-pink)] border-3 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] rounded-lg flex items-center justify-center">
+            <KeyRound className="w-5 h-5 text-black stroke-[3]" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black uppercase text-black">AI Keys</h2>
+            <p className="text-sm text-zinc-600 font-medium">
+              Stored only on this device (localStorage). Brain calls Gemini first; on rate limit or auth error it falls back to OpenRouter (gpt-5-nano).
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-bold uppercase text-black tracking-wide">Gemini API Key</label>
+          <div className="flex gap-2">
+            <Input
+              type={showGemini ? 'text' : 'password'}
+              value={geminiKeyInput}
+              onChange={(event) => setGeminiKeyInput(event.target.value)}
+              placeholder="AIza..."
+              className="neo-input"
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <Button
+              type="button"
+              onClick={() => setShowGemini((value) => !value)}
+              className="neo-btn bg-zinc-200 text-black px-3"
+              title={showGemini ? 'Hide key' : 'Show key'}
+            >
+              {showGemini ? <EyeOff className="w-4 h-4 stroke-[3]" /> : <Eye className="w-4 h-4 stroke-[3]" />}
+            </Button>
+          </div>
+          <p className="text-xs text-zinc-500 font-medium">{maskedHint(getAiKeys().geminiKey)} · Get one at aistudio.google.com/apikey</p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-bold uppercase text-black tracking-wide">OpenRouter API Key</label>
+          <div className="flex gap-2">
+            <Input
+              type={showOpenrouter ? 'text' : 'password'}
+              value={openrouterKeyInput}
+              onChange={(event) => setOpenrouterKeyInput(event.target.value)}
+              placeholder="sk-or-..."
+              className="neo-input"
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <Button
+              type="button"
+              onClick={() => setShowOpenrouter((value) => !value)}
+              className="neo-btn bg-zinc-200 text-black px-3"
+              title={showOpenrouter ? 'Hide key' : 'Show key'}
+            >
+              {showOpenrouter ? <EyeOff className="w-4 h-4 stroke-[3]" /> : <Eye className="w-4 h-4 stroke-[3]" />}
+            </Button>
+          </div>
+          <p className="text-xs text-zinc-500 font-medium">{maskedHint(getAiKeys().openrouterKey)} · Get one at openrouter.ai/keys · Model locked to openai/gpt-5-nano</p>
+        </div>
+
+        <div className="flex flex-wrap gap-3 pt-2">
+          <Button onClick={handleSaveKeys} className="neo-btn bg-[var(--color-neo-green)] text-black">
+            <Save className="w-4 h-4 mr-2 stroke-[3]" /> Save Keys
+          </Button>
+          <Button onClick={handleClearKeys} className="neo-btn bg-zinc-200 text-black hover:bg-red-500 hover:text-white transition-colors">
+            <Trash2 className="w-4 h-4 mr-2 stroke-[3]" /> Clear
+          </Button>
+          {keysSavedAt && (
+            <span className="text-xs text-zinc-500 font-medium self-center">Saved at {new Date(keysSavedAt).toLocaleTimeString()}</span>
+          )}
         </div>
       </div>
 

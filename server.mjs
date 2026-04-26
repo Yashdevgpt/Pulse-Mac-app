@@ -2,14 +2,26 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
-import { createServer as createViteServer } from 'vite';
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import crypto from 'crypto';
+import { fileURLToPath } from 'url';
 
-dotenv.config({ path: '.env.local' });
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const isProduction = process.env.PULSE_MODE === 'production';
+
+// Production (Electron) loads its .env from the user-writable userData
+// directory so updates to the .app never blow away credentials. Main.cjs
+// passes the resolved path via PULSE_ENV_PATH. In dev we keep the
+// historical behavior of reading .env.local from the working directory.
+if (isProduction) {
+  const envPath = process.env.PULSE_ENV_PATH || path.join(__dirname, '.env');
+  dotenv.config({ path: envPath });
+} else {
+  dotenv.config({ path: '.env.local' });
+  dotenv.config();
+}
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -354,18 +366,27 @@ const chunkText = (content, size = 1200, overlap = 150) => {
   return chunks.filter(Boolean).slice(0, MAX_CHUNKS_PER_SOURCE);
 };
 
-const getGemini = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    const error = new Error('Gemini API key is not configured.');
-    error.status = 500;
+// AI keys arrive per-request in headers. We never read them from process.env
+// so the user owns + rotates their keys via the in-app Admin → AI Keys panel.
+const getAiKeysFromReq = (req) => ({
+  geminiKey: String(req.headers['x-gemini-key'] || '').trim(),
+  openrouterKey: String(req.headers['x-openrouter-key'] || '').trim(),
+});
+
+const requireGeminiKey = (req) => {
+  const { geminiKey } = getAiKeysFromReq(req);
+  if (!geminiKey) {
+    const error = new Error('Gemini API key is not set.');
+    error.status = 412;
     throw error;
   }
-  return new GoogleGenAI({ apiKey });
+  return geminiKey;
 };
 
-const embedText = async (text, taskType = 'RETRIEVAL_DOCUMENT') => {
-  const ai = getGemini();
+const getGemini = (req) => new GoogleGenAI({ apiKey: requireGeminiKey(req) });
+
+const embedText = async (req, text, taskType = 'RETRIEVAL_DOCUMENT') => {
+  const ai = getGemini(req);
   const response = await ai.models.embedContent({
     model: embeddingModel,
     contents: [{ role: 'user', parts: [{ text: cleanText(text, 8000) }] }],
@@ -381,6 +402,101 @@ const embedText = async (text, taskType = 'RETRIEVAL_DOCUMENT') => {
   }
 
   return values;
+};
+
+// Detects rate-limit / quota / auth errors from the Gemini SDK so we can
+// transparently fall back to OpenRouter for chat completions. Embeddings
+// stay Gemini-only because the vector dimension is fixed in Supabase.
+const isGeminiFallbackError = (error) => {
+  const status = Number(error?.status || error?.code || error?.response?.status || 0);
+  if (status === 429 || status === 403 || status === 401) return true;
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    message.includes('rate limit') ||
+    message.includes('quota') ||
+    message.includes('resource_exhausted') ||
+    message.includes('exceeded') ||
+    message.includes('api key not valid') ||
+    message.includes('invalid api key')
+  );
+};
+
+const OPENROUTER_MODEL = 'openai/gpt-5-nano';
+const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+
+// Calls OpenRouter's OpenAI-compatible chat completions endpoint with the
+// caller-supplied API key. Returns the assistant text. We deliberately keep
+// the SDK surface tiny (raw fetch) so there is no extra dep, and so the
+// fallback path is easy to reason about.
+const callOpenRouterChat = async (apiKey, prompt) => {
+  if (!apiKey) {
+    const error = new Error('OpenRouter API key is not set; cannot fall back from Gemini.');
+    error.status = 412;
+    throw error;
+  }
+
+  const response = await fetch(OPENROUTER_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://pulse.local',
+      'X-Title': 'Pulse',
+    },
+    body: JSON.stringify({
+      model: OPENROUTER_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload?.error?.message || `OpenRouter request failed with status ${response.status}.`;
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  const text = payload?.choices?.[0]?.message?.content;
+  if (typeof text !== 'string' || !text.trim()) {
+    throw new Error('OpenRouter returned an empty response.');
+  }
+  return text;
+};
+
+// Runs the Gemini chat call first; on rate-limit / quota / auth failure
+// retries the same prompt against OpenRouter. Sets `X-Provider-Used` so the
+// client can show a one-time "switched to OpenRouter" toast.
+const runChatWithFallback = async (req, res, prompt, geminiConfig = {}) => {
+  const { geminiKey, openrouterKey } = getAiKeysFromReq(req);
+  if (!geminiKey && !openrouterKey) {
+    const error = new Error('No AI keys configured. Add a Gemini and/or OpenRouter key in Admin → AI Keys.');
+    error.status = 412;
+    throw error;
+  }
+
+  if (geminiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey: geminiKey });
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: geminiConfig,
+      });
+      res.setHeader('X-Provider-Used', 'gemini');
+      return { provider: 'gemini', response };
+    } catch (error) {
+      if (!isGeminiFallbackError(error) || !openrouterKey) throw error;
+      console.warn('Gemini call failed, falling back to OpenRouter:', error?.message || error);
+    }
+  }
+
+  const text = await callOpenRouterChat(openrouterKey, prompt);
+  res.setHeader('X-Provider-Used', 'openrouter');
+  return {
+    provider: 'openrouter',
+    response: { text, candidates: [] },
+  };
 };
 
 const assertSupabase = () => {
@@ -575,11 +691,11 @@ const loadExistingSourceChunks = async (uid, sourceType, sourceId) => {
   );
 };
 
-const enrichRowsWithEmbeddings = async (rows, title, heading) => {
+const enrichRowsWithEmbeddings = async (req, rows, title, heading) => {
   const embeddedRows = [];
 
   for (const item of rows) {
-    const embedding = await embedText(getSourceLabel(title, heading, item.content), 'RETRIEVAL_DOCUMENT');
+    const embedding = await embedText(req, getSourceLabel(title, heading, item.content), 'RETRIEVAL_DOCUMENT');
     embeddedRows.push({
       ...item.row,
       embedding,
@@ -599,7 +715,7 @@ const upsertRows = async (rows) => {
   if (error) throw normalizeBrainMemoryError(error);
 };
 
-const indexSingleSource = async (uid, source) => {
+const indexSingleSource = async (req, uid, source) => {
   const nextSource = await buildSourceRows(uid, source);
   if (!nextSource) {
     return { embedded: 0, indexed: 0, reused: 0 };
@@ -608,7 +724,7 @@ const indexSingleSource = async (uid, source) => {
   const existingChunks = await loadExistingSourceChunks(uid, nextSource.sourceType, nextSource.sourceId);
   const changedRows = nextSource.rows.filter((item) => existingChunks.get(item.chunkIndex) !== item.contentHash);
   const reused = nextSource.rows.length - changedRows.length;
-  const embeddedRows = await enrichRowsWithEmbeddings(changedRows, nextSource.title, nextSource.heading);
+  const embeddedRows = await enrichRowsWithEmbeddings(req, changedRows, nextSource.title, nextSource.heading);
 
   await upsertRows(embeddedRows);
   await deleteStaleChunks(uid, nextSource.sourceType, nextSource.sourceId, nextSource.chunkCount);
@@ -636,14 +752,14 @@ const deleteStaleChunks = async (uid, sourceType, sourceId, chunkCount) => {
   if (error) throw normalizeBrainMemoryError(error);
 };
 
-const indexSources = async (uid, sources) => {
+const indexSources = async (req, uid, sources) => {
   await ensureBrainMemorySchemaReady();
   let embedded = 0;
   let indexed = 0;
   let reused = 0;
 
   for (const source of sources.slice(0, 80)) {
-    const result = await indexSingleSource(uid, source);
+    const result = await indexSingleSource(req, uid, source);
     embedded += result.embedded;
     indexed += result.indexed;
     reused += result.reused;
@@ -723,9 +839,9 @@ const getRecentMemorySources = async (uid, sourceTypes = allBrainSourceTypes, li
   return recentSources;
 };
 
-const searchMemory = async (uid, question, sourceTypes = allBrainSourceTypes) => {
+const searchMemory = async (req, uid, question, sourceTypes = allBrainSourceTypes) => {
   await ensureBrainMemorySchemaReady();
-  const embedding = await embedText(question, 'RETRIEVAL_QUERY');
+  const embedding = await embedText(req, question, 'RETRIEVAL_QUERY');
   const { data, error } = await supabase.rpc('match_brain_chunks', {
     match_user_id: uid,
     query_embedding: embedding,
@@ -861,7 +977,7 @@ app.post('/api/brain/index', rateLimit, async (req, res) => {
         return jsonError(res, 413, `Source title exceeds ${MAX_TITLE_LENGTH} characters.`);
       }
     }
-    const result = await indexSources(user.uid, sources);
+    const result = await indexSources(req, user.uid, sources);
     res.json(result);
   } catch (error) {
     if (error.status !== 401) console.error('Brain index error:', error);
@@ -914,7 +1030,7 @@ app.post('/api/brain/reset-memory', rateLimit, async (req, res) => {
 });
 
 app.post('/api/brain/chat', rateLimit, async (req, res) => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const { geminiKey, openrouterKey } = getAiKeysFromReq(req);
   const question = String(req.body?.question || '').trim().slice(0, MAX_QUESTION_LENGTH);
   const mode = ['work', 'work_web', 'web'].includes(req.body?.mode) ? req.body.mode : 'work';
   // Preserve the full saved conversation. Each individual message still has
@@ -937,8 +1053,8 @@ app.post('/api/brain/chat', rateLimit, async (req, res) => {
       text: typeof source.text === 'string' ? source.text.slice(0, MAX_CLIENT_SOURCE_CONTENT) : source.text,
     }));
 
-  if (!apiKey) {
-    return res.status(500).json({ error: 'Gemini API key is not configured.' });
+  if (!geminiKey && !openrouterKey) {
+    return res.status(412).json({ error: 'No AI keys configured. Add a Gemini and/or OpenRouter key in Admin → AI Keys.' });
   }
 
   if (!question) {
@@ -948,16 +1064,17 @@ app.post('/api/brain/chat', rateLimit, async (req, res) => {
   try {
     const user = await verifyFirebaseUser(req);
     enforceUserRateLimit(user, res);
-    const ai = getGemini();
     let memorySources = [];
     let recentSources = [];
     const questionProfile = getQuestionSourceProfile(question);
     const { sourceTypes: questionSourceTypes, recentIntent } = questionProfile;
 
-    if (mode !== 'web') {
+    // Memory search needs Gemini for query embedding. If only an OpenRouter
+    // key is set we skip private memory and answer from clientSources / web.
+    if (mode !== 'web' && geminiKey) {
       try {
         [memorySources, recentSources] = await Promise.all([
-          searchMemory(user.uid, question, questionSourceTypes),
+          searchMemory(req, user.uid, question, questionSourceTypes),
           recentIntent ? getRecentMemorySources(user.uid, questionSourceTypes) : Promise.resolve([]),
         ]);
       } catch (error) {
@@ -999,13 +1116,13 @@ app.post('/api/brain/chat', rateLimit, async (req, res) => {
       ? {}
       : { tools: [{ googleSearch: {} }] };
 
-    const response = await ai.models.generateContent({
-      model,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config,
-    });
+    const { provider, response } = await runChatWithFallback(req, res, prompt, config);
 
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    // Gemini's googleSearch grounding only exists on Gemini responses; the
+    // OpenRouter fallback simply has no web sources to surface.
+    const groundingChunks = provider === 'gemini'
+      ? response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
+      : [];
     const webSources = groundingChunks
       .map(chunk => chunk.web)
       .filter(Boolean)
@@ -1019,6 +1136,7 @@ app.post('/api/brain/chat', rateLimit, async (req, res) => {
 
     res.json({
       answer,
+      provider,
       sources: citedPrivateSources.slice(0, 8).map(source => ({
         title: source.title || 'Untitled',
         type: source.source_type || source.sourceType || 'brain_card',
@@ -1079,17 +1197,12 @@ app.post('/api/brain/summarize-history', rateLimit, async (req, res) => {
       return jsonError(res, 400, 'Need at least two messages to summarize.');
     }
 
-    const ai = getGemini();
     const prompt = buildHistorySummaryPrompt(messages);
-    const response = await ai.models.generateContent({
-      model,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: {},
-    });
+    const { response } = await runChatWithFallback(req, res, prompt, {});
 
     const summary = String(response.text || '').trim();
     if (!summary) {
-      return jsonError(res, 502, 'Gemini did not return a summary.');
+      return jsonError(res, 502, 'AI provider did not return a summary.');
     }
 
     res.json({
@@ -1108,20 +1221,33 @@ if (supabase) {
   });
 }
 
-const vite = await createViteServer({
-  configFile: false,
-  plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: {
-      '@': path.resolve(process.cwd(), './src'),
+if (isProduction) {
+  // Electron build: serve the static Vite output bundled alongside the
+  // server. The dist directory is shipped via electron-builder's
+  // extraResources next to server.mjs.
+  const distDir = path.join(__dirname, 'dist');
+  app.use(express.static(distDir));
+  app.get('*', (req, res) => res.sendFile(path.join(distDir, 'index.html')));
+} else {
+  // Dev: Vite middleware with HMR. Imports are dynamic so the production
+  // bundle (Electron) does not pull in vite/react plugins.
+  const { createServer: createViteServer } = await import('vite');
+  const reactPlugin = (await import('@vitejs/plugin-react')).default;
+  const tailwindPlugin = (await import('@tailwindcss/vite')).default;
+  const vite = await createViteServer({
+    configFile: false,
+    plugins: [reactPlugin(), tailwindPlugin()],
+    resolve: {
+      alias: {
+        '@': path.resolve(process.cwd(), './src'),
+      },
     },
-  },
-  server: { middlewareMode: true, hmr: process.env.DISABLE_HMR !== 'true' },
-  appType: 'spa',
-});
+    server: { middlewareMode: true, hmr: process.env.DISABLE_HMR !== 'true' },
+    appType: 'spa',
+  });
+  app.use(vite.middlewares);
+}
 
-app.use(vite.middlewares);
-
-app.listen(port, '0.0.0.0', () => {
+app.listen(port, '127.0.0.1', () => {
   console.log(`Pulse running at http://localhost:${port}/`);
 });
