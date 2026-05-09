@@ -211,7 +211,7 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
                   <Button 
                     type="submit"
                     disabled={isSubmitting}
-                    className="neo-btn mt-6 w-full bg-[var(--color-neo-pink)] py-6 text-lg"
+                    className="neo-btn mt-6 w-full bg-[var(--color-neo-violet)] py-6 text-lg"
                   >
                     {isSubmitting ? 'Authenticating...' : 'Sign In'}
                   </Button>
@@ -242,7 +242,7 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
             </div>
             <div className="neo-box w-full space-y-6 bg-[var(--color-neo-surface)] p-8 text-center">
               <div className="flex justify-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-4 border-black bg-[var(--color-neo-pink)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-4 border-black bg-[var(--color-neo-violet)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                   <Activity className="h-8 w-8 text-black stroke-[3]" />
                 </div>
               </div>

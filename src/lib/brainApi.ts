@@ -89,6 +89,12 @@ const callBrainApi = async <T>(path: string, body: Record<string, unknown>) => {
   return result as T;
 };
 
+export const requireBrainMemoryGeminiKey = () => {
+  if (!getAiKeys().geminiKey) {
+    throw new Error('Gemini API key is required for Brain memory indexing because embeddings are Gemini-only. Open Admin → AI Keys to set it.');
+  }
+};
+
 const cleanMemoryText = (value: string, max = 12000) =>
   String(value || '')
     .replace(/\r\n?/g, '\n')
@@ -306,8 +312,10 @@ export const buildCentralizedBrainSources = async ({
   ];
 };
 
-export const indexBrainSources = (sources: BrainMemorySource[]) =>
-  callBrainApi<{ embedded: number; indexed: number; reused?: number }>('/api/brain/index', { sources });
+export const indexBrainSources = (sources: BrainMemorySource[]) => {
+  requireBrainMemoryGeminiKey();
+  return callBrainApi<{ embedded: number; indexed: number; reused?: number }>('/api/brain/index', { sources });
+};
 
 // Sugar for the common case of pushing a single source (one card / one chat)
 // to Brain memory immediately after a Firestore save. Avoids forcing the

@@ -382,7 +382,7 @@ export default function Bridge() {
         </div>
 
         <div className="pt-4 border-t-3 border-black flex justify-end">
-          <Button onClick={handleSubmit} size="lg" className="neo-btn bg-[var(--color-neo-pink)] w-full sm:w-auto text-lg px-8">
+          <Button onClick={handleSubmit} size="lg" className="neo-btn bg-[var(--color-neo-violet)] w-full sm:w-auto text-lg px-8">
             Log Update
           </Button>
         </div>

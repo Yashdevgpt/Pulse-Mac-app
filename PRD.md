@@ -49,20 +49,29 @@
 #### Watchtower (`/watchtower`)
 - System and ongoing-task monitoring. Standard users see their own; admins see all.
 - **Tag Filtering:** A controlled, portaled popover (rendered to `document.body`) presents the user's tags as toggleable rows with `Select All` / `Clear All`. Selection is persisted to Firestore via Watchtower preferences.
-- **Tag CRUD:** Inline "+ New Tag" form (name + 8-color palette) creates tags and adds them to the visible set. Per-tag trash icon deletes the tag from Firestore and from Brain memory (`tag_record`).
+- **Tag CRUD:** Inline "+ New Tag" form (name + 8-color palette: blue, purple, green, red, orange, indigo, cyan, yellow) creates tags and adds them to the visible set. Per-tag trash icon deletes the tag from Firestore and from Brain memory (`tag_record`).
 
 #### Brain (`/brain`)
 - Captures user-authored knowledge as Brain Cards, supports saved chats with the AI, and chats across centralised Pulse memory.
-- **Chat panel layout:** Fixed-height card (`h-[680px]` mobile, `lg:h-[720px]` when chat sits below the editor, `xl:h-[calc(100vh-7rem)]` with a hard cap of 900 px when chat moves to the right column) that scrolls messages internally and keeps the input pinned at the bottom. On `xl` and above (≥1280 px) the panel is sticky to the viewport so it never scrolls out of view.
+- **Chat panel layout:** Viewport-aware Brain Chat card that scrolls messages internally and keeps the input pinned at the bottom. The layout expands the Brain Chat column when the manual sidebar is closed, compacts the mode/rebuild controls on wide screens, and keeps Saved Chats behind a History popover so saved history does not permanently consume conversation height.
 - **Sources rendering:** Brain answers carry an optional `sources` (private) and `webSources` (web grounding) payload. The UI renders web sources as clickable `<a target="_blank">` links and private sources as labelled pills. The system prompt suppresses the model from emitting a redundant inline "Sources:" line.
 - **Auto-Index on Save:** Saving a Brain card or saving a Brain chat triggers a fire-and-forget call to `/api/brain/index` for that single source. Failures emit a soft toast directing the user to "Rebuild Memory" as the manual recovery path.
 - **Summarize Older History:** A scissors-icon button appears in the chat header once there are ≥15 real messages. It compresses everything older than the most recent 10 into a single synthetic summary message via `/api/brain/summarize-history`, preserving facts, decisions, open questions, and topic order.
 - **Reset Memory:** An eraser-icon button next to "Rebuild Memory" wipes every `brain_chunks` row owned by the requesting user (via `/api/brain/reset-memory`) and immediately re-indexes from current Firestore state. Used to reconcile the vector store after deletes.
+- **Rich Card Editor:** Brain Cards use a single Word-like rich editor rather than a plain textarea plus preview. The editor supports H1, H2, bold, italic, underline, hyperlinks, bullet lists, numbered lists, quotes, and inline code while storing the result as Markdown text in the existing card content field.
+- **Long Card Scrolling:** The selected Brain Card editor is height-bounded and scrolls internally only when card content is long, preventing the editor from stretching the whole Brain page.
+- **Local Chat Draft Recovery:** One active unsaved Brain chat draft per user is stored in this Mac's `localStorage` so navigation away from Brain does not lose the current unsaved chat. Starting a new chat offers Save Current, Discard, or Cancel; Discard clears the local draft from the device.
+- **My Work Without AI Keys:** In `My Work` mode, if no Gemini/OpenRouter keys are configured, Pulse answers locally from saved Brain cards instead of surfacing an LLM key error. Memory rebuild/reset still require a Gemini key because embeddings are Gemini-only.
+
+#### Archive (`/archive`)
+- Provides a local export center for downloading account data without adding new database writes.
+- Exports Markdown-first ZIP archives with a `README.md`, user profile summary, Fleet DSPs, Fleet logs, tags, Watchtower preferences, and Brain Cards. Brain chats are intentionally excluded from exports.
+- Supports all-time or one-year date windows and optional attachment inclusion. AI keys, environment secrets, and Supabase vector chunks are never included.
 
 ## 4. Technical Architecture
 - **Frontend Framework:** React 19 with Vite.
 - **Routing:** React Router DOM v7.
-- **Styling:** Tailwind CSS with a custom Neo-Brutalist design system (thick borders, hard shadows, vibrant colors like neo-yellow, neo-pink, neo-green, neo-cyan).
+- **Styling:** Tailwind CSS with a custom Neo-Brutalist design system (thick borders, hard shadows, vibrant colors like neo-yellow, neo-violet, neo-green, neo-cyan).
 - **Backend / API:** Node.js + Express (`server.mjs`) serving Brain endpoints (`/api/brain/index`, `/api/brain/delete-source`, `/api/brain/chat`, `/api/brain/summarize-history`, `/api/brain/reset-memory`). The server has two run modes:
   - **Dev (`PULSE_MODE` unset):** loads Vite middleware via dynamic `import('vite')` so Tailwind, the React plugin, and HMR work for `npm run electron:dev` and `npm run dev`.
   - **Production (`PULSE_MODE=production`):** skips the Vite import entirely, serves the static `dist/` build, and reads its `.env` from `process.env.PULSE_ENV_PATH` (Electron passes the user-writable `~/Library/Application Support/Pulse/.env` path). The server always binds to `127.0.0.1` so no LAN port is exposed.
@@ -91,6 +100,7 @@
 - **Typography:** Bold, uppercase headings, high contrast.
 - **Interactive Elements:** Buttons and inputs feature translate effects on hover/active states to simulate physical pressing.
 - **Naming:** Navbar items and page headings use single-word names (`Bridge`, `Fleet`, `Brain`, `Watchtower`, `Admin`). The "The" prefix that previously appeared in nav labels and page H1s has been dropped to keep the brand crisper.
+- **Navigation Shell:** The sidebar is manually toggled open/closed and persists per Mac in `localStorage` (`pulse:nav-open:v1`). When the sidebar is closed, the app shows a compact top bar with one open-navigation control and no duplicate theme toggle; when open, the sidebar is part of normal page flow rather than a sticky overlay.
 
 ## 6. Future Enhancements
 - Email notifications for waitlist approvals.
@@ -261,7 +271,7 @@
 - **Reason:** Watchtower's third-party DropdownMenu trigger threw at runtime and unmounted the entire `/watchtower` route (no Error Boundary) producing a blank page that required a hard refresh; users could neither create nor delete tags from the UI; Fleet had no way to pin priority partners; the Bridge greeting pool was 6 lines; the project shipped without a favicon; and the user wanted nav labels stripped of the "The" prefix.
 - **Changes:**
   - **Watchtower Filter Tags popover (blank-page fix):** Replaced the `@base-ui/react` DropdownMenu with a controlled component portaled to `document.body` (`createPortal`) using fixed-position coordinates derived from the trigger's `getBoundingClientRect()`, recomputed on `resize` and `scroll`. Click-outside detection covers both the trigger and the portaled panel. Escapes the parent `Card`'s `overflow-hidden` so the panel never clips at the bottom.
-  - **Watchtower tag CRUD:** Added inline "+ New Tag" form (name + 8-color palette: blue, purple, green, red, orange, pink, cyan, yellow) inside the popover. New tags are saved to Firestore via `db.saveTag()` and immediately added to the visible-tag set. Per-tag trash icon (subtle until hover) confirms, removes the Brain memory chunks for `tag_record:tagId`, deletes the Firestore record, and rolls back the optimistic UI on failure.
+  - **Watchtower tag CRUD:** Added inline "+ New Tag" form (name + 8-color palette: blue, purple, green, red, orange, indigo, cyan, yellow) inside the popover. New tags are saved to Firestore via `db.saveTag()` and immediately added to the visible-tag set. Per-tag trash icon (subtle until hover) confirms, removes the Brain memory chunks for `tag_record:tagId`, deletes the Firestore record, and rolls back the optimistic UI on failure.
   - **Fleet starring:** Added `starred?: boolean` to the `DSP` interface. Star toggle button on every Fleet card (filled yellow when starred, plain otherwise) with optimistic UI and rollback. Sort order is starred-first then `updatedAt` desc within each group.
   - **Bridge greeting pool:** Expanded to **102 static greetings** plus **8 generated per starred DSP**. The pool is built inside `loadData()` after Firestore returns, so unstarring a DSP cleanly removes its greetings on the next visit. Floor pool size is always ≥102.
   - **Favicon:** Added `public/favicon.svg` — a bold "P" letterform on Pulse-yellow `#ffc900` with a black neo-brutalist border and a small heartbeat trace at the bottom-left. Rendered from primitives so it doesn't depend on system fonts. Linked from `index.html` along with `theme-color="#f97316"` and a description meta tag.
@@ -333,3 +343,48 @@
 - **Timeline:**
   - 2026-04-27: AI key store, brain API header injection, server refactor with OpenRouter fallback, Admin AI Keys panel, Electron main process, electron-builder config, custom `.icns`, `.env.example` cleanup, and `.gitignore` adjustments shipped.
   - 2026-04-27: Branch `anthr/elated-perlman-cb6e44` merged into `main` via no-ff merge, custom Pulse icon rebuilt and shipped, repo topology split between `Pulse-Main` (web backup) and `Pulse-Mac-app` (active Mac project) with `remote.pushDefault = pulsemac` configured to prevent accidental cross-pushes.
+
+### 2026-05-09 - Export Center, Brain UX Hardening, and Violet Accent Refresh
+- **Approval:** User approved completing the PRD after the export, Brain UX, editor scrolling, and color refresh changes were implemented and verified.
+- **Reason:** The user wanted durable local exports for important account data, clearer no-key Brain behavior, persistent unsaved Brain chats when navigating around the app, Word-like formatting inside Brain Cards, long-card scrolling, and replacement of the old warm accent while preserving the neo-brutalist design consistency.
+- **Changes:**
+  - **Archive export center:** Added `/archive` with a local Markdown ZIP export flow. Exports include profile data, Fleet DSPs, Fleet logs, custom tags, Watchtower preferences, and Brain Cards. Brain chats, AI keys, environment secrets, and Supabase vector chunks are excluded. Date windows support all-time and one-year exports, with optional attachment inclusion.
+  - **Read-only export data access:** Added export-only Firestore helpers in `src/lib/db.ts` and Markdown ZIP generation in `src/lib/dataExport.ts`. The export path performs no extra database writes, keeping the free-tier database footprint unchanged.
+  - **Brain memory no-key behavior:** Rebuild Memory and Reset Memory now fail fast with a Gemini-key requirement before making memory calls. `/api/brain/index` checks the Gemini key before Supabase indexing, and expected no-key failures are shown as actionable UI errors instead of generic `fetch failed` behavior.
+  - **My Work local answer path:** In Brain Chat `My Work` mode, if no Gemini/OpenRouter keys are configured, Pulse answers locally from saved Brain Cards and source passages instead of calling the LLM endpoint and showing an AI-key error. Memory rebuild remains Gemini-only because embeddings are Gemini-only.
+  - **Brain chat draft persistence:** Added one active local draft per user in `localStorage` with a size cap and expiry. Navigating away from Brain and back restores the unsaved conversation. New Chat now asks whether to save, discard from this Mac, or cancel.
+  - **Rich Brain Card editor:** Replaced the plain textarea with a single Word-like editor backed by Markdown storage. Toolbar controls include H1, H2, bold, italic, underline, hyperlink, bullet list, numbered list, quote, and inline code. The separate preview panel was removed.
+  - **Long-card scrolling:** The Brain Card list and selected card editor are height-bounded with internal scrolling so long cards do not stretch or clip the page.
+  - **Violet accent refresh:** Replaced the old accent token with `neo-violet` across auth, layout account footer, Admin AI key/admin badge surfaces, Bridge's primary log button, Brain Chat header, and the shared theme tokens. Watchtower's new-tag palette replaced the old warm swatch with indigo.
+- **Logs:**
+  - `npm run lint` passed.
+  - `npm run build` passed.
+  - `node --check server.mjs` passed.
+  - `curl -I http://localhost:3000/brain` returned `HTTP/1.1 200 OK`.
+  - Headless Chrome confirmed long Brain Card editor content scrolls internally (`canScroll: true`) and short content does not create unnecessary scrolling.
+  - Source and built CSS checks found no remaining old-accent tokens after the violet refresh.
+  - Browser verification on `/brain` showed the Brain Chat header and account footer using the violet accent while the page remained visually consistent.
+- **Timeline:**
+  - 2026-05-09, before 15:14 IST: Added local Markdown ZIP export infrastructure and the `/archive` entry point.
+  - 2026-05-09, before 15:14 IST: Hardened Brain memory no-key handling and added local `My Work` answers without LLM keys.
+  - 2026-05-09, before 15:14 IST: Added local active-chat draft recovery, rich Brain Card editing, and long-card scroll containment.
+  - 2026-05-09, before 15:14 IST: Replaced old accent surfaces with the violet theme token and updated Watchtower's tag palette.
+  - 2026-05-09, 15:14 IST: PRD updated after user approval.
+
+### 2026-05-10 - Manual Navbar Toggle and Brain Chat Workspace Expansion
+- **Approval:** User approved updating the PRD and pushing the latest updates to the correct GitHub repository after the navbar and Brain Chat workspace changes were implemented and verified.
+- **Reason:** The sidebar needed to be manually openable/closable without duplicate close/theme controls, and the Brain Chat panel still felt vertically constrained because Saved Chats occupied fixed space inside the chat body.
+- **Changes:**
+  - **Manual navbar toggle:** Reworked `src/components/Layout.tsx` so the sidebar can be manually opened and closed on all screen sizes, persists in `localStorage`, and is no longer a sticky overlay. The closed state shows a compact top bar with one open-navigation button and the Pulse mark; the open state shows one close button and the existing full theme toggle inside the sidebar.
+  - **Brain workspace expansion:** Updated the Brain grid and shared CSS so closing the navbar gives the Brain workspace more horizontal space, widening the chat column on large screens without disturbing the card editor.
+  - **Saved Chats as secondary UI:** Moved the Saved Chats rail out of the fixed chat body and into a History popover in the Brain Chat header. This keeps saved conversations accessible while prioritising the live message area and pinned input.
+  - **Chat height tuning:** Replaced fixed chat-height utilities with responsive `clamp(...)` CSS rules that give the chat more vertical room on taller desktops while keeping the input reachable on shorter browser heights.
+- **Logs:**
+  - `npm run lint` passed.
+  - `npm run build` passed with the existing Vite large chunk warning only.
+  - `curl -I --max-time 5 http://localhost:3000/brain` returned `HTTP/1.1 200 OK`.
+  - Browser verification on `/brain` confirmed the compact closed-navbar state, wider Brain Chat column, History popover for Saved Chats, visible chat input, and no browser console errors.
+- **Timeline:**
+  - 2026-05-09, before 17:13 IST: Navbar duplicate-controls issue fixed by moving to one manual sidebar toggle and one sidebar-only theme control.
+  - 2026-05-09, before 17:13 IST: Brain Chat was widened in the closed-navbar workspace and Saved Chats moved to the History popover.
+  - 2026-05-10, 03:24 IST: PRD updated after user approval to push the latest changes.

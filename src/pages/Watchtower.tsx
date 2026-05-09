@@ -21,7 +21,7 @@ const TAG_COLOR_PALETTE = [
   'bg-green-500',
   'bg-red-500',
   'bg-orange-500',
-  'bg-pink-500',
+  'bg-indigo-500',
   'bg-cyan-500',
   'bg-yellow-500',
 ];

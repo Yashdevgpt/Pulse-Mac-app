@@ -7,6 +7,7 @@ import Logbook from './pages/Logbook';
 import Watchtower from './pages/Watchtower';
 import Admin from './pages/Admin';
 import Brain from './pages/Brain';
+import Archive from './pages/Archive';
 import { db } from './lib/db';
 import { AuthWrapper } from './components/AuthWrapper';
 
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="logbook/:dspId" element={<Logbook />} />
             <Route path="brain" element={<Brain />} />
             <Route path="watchtower" element={<Watchtower />} />
+            <Route path="archive" element={<Archive />} />
             <Route path="admin" element={<Admin />} />
           </Route>
         </Routes>

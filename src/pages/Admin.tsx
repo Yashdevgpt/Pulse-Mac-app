@@ -133,7 +133,7 @@ export default function Admin() {
 
       <div className="neo-box p-6 bg-white space-y-5 mb-8">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[var(--color-neo-pink)] border-3 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] rounded-lg flex items-center justify-center">
+          <div className="w-10 h-10 bg-[var(--color-neo-violet)] border-3 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] rounded-lg flex items-center justify-center">
             <KeyRound className="w-5 h-5 text-black stroke-[3]" />
           </div>
           <div>
@@ -246,7 +246,7 @@ export default function Admin() {
                   <p className="text-sm text-zinc-600 font-medium">{user.email}</p>
                   <div className="mt-2">
                     <span className={`text-xs font-bold px-2 py-1 border-2 border-black rounded-md shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
-                      user.status === 'admin' ? 'bg-[var(--color-neo-pink)] text-black' :
+                      user.status === 'admin' ? 'bg-[var(--color-neo-violet)] text-black' :
                       user.status === 'approved' ? 'bg-[var(--color-neo-green)] text-black' :
                       user.status === 'rejected' ? 'bg-red-500 text-white' :
                       'bg-[var(--color-neo-yellow)] text-black'

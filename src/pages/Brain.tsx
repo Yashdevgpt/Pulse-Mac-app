@@ -4,16 +4,20 @@ import { Brain as BrainIcon, Eraser, ExternalLink, FileText, History, Link2, Mes
 import { toast } from 'sonner';
 
 import MarkdownMessage from '@/components/MarkdownMessage';
+import RichMarkdownEditor from '@/components/RichMarkdownEditor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CHAT_MODES, CHAT_WELCOME } from '@/features/brain/constants';
 import { extractKnowledgeFile } from '@/features/brain/file-extraction';
 import { getBrainResponse, getGroundingPassages } from '@/features/brain/grounding';
 import type { ChatMessage, ExtractedKnowledgeFile } from '@/features/brain/types';
 import { auth } from '@/lib/firebase';
 import { db, BrainCard, BrainChat } from '@/lib/db';
+import { hasGeminiKey, hasOpenrouterKey } from '@/lib/aiKeys';
+import { clearBrainDraft, hasBrainDraftContent, loadBrainDraft, saveBrainDraft } from '@/lib/brainDraft';
 import {
   askBrainAi,
   buildCentralizedBrainSources,
@@ -22,6 +26,7 @@ import {
   deleteBrainMemorySource,
   indexBrainSource,
   indexBrainSources,
+  requireBrainMemoryGeminiKey,
   resetBrainMemory,
   summarizeBrainHistory,
   type BrainMemorySource,
@@ -54,8 +59,12 @@ export default function Brain() {
   const [isIndexing, setIsIndexing] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isNewChatDialogOpen, setIsNewChatDialogOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([CHAT_WELCOME]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const draftRestoredRef = useRef(false);
+  const draftSizeWarningShownRef = useRef(false);
   // Pinned to the messages list so we can keep the newest reply visible without
   // forcing the user to scroll. Auto-snaps to the bottom whenever the messages
   // array grows.
@@ -69,6 +78,41 @@ export default function Brain() {
   useEffect(() => {
     loadBrainData();
   }, []);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid || draftRestoredRef.current) return;
+
+    const draft = loadBrainDraft(uid);
+    draftRestoredRef.current = true;
+    if (!draft) return;
+
+    setSelectedChatId(draft.selectedChatId);
+    setChatMode(draft.chatMode);
+    setQuestion(draft.question);
+    setMessages(draft.messages.length > 0 ? draft.messages : [{ ...CHAT_WELCOME, createdAt: Date.now() }]);
+  }, []);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid || !draftRestoredRef.current) return;
+
+    const timeout = window.setTimeout(() => {
+      const result = saveBrainDraft(uid, {
+        selectedChatId,
+        chatMode,
+        messages,
+        question,
+      });
+
+      if (result.saved === false && result.reason === 'too_large' && !draftSizeWarningShownRef.current) {
+        draftSizeWarningShownRef.current = true;
+        toast.warning('Brain draft is too large for local recovery. Save the chat to keep it.');
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [selectedChatId, chatMode, messages, question]);
 
   const selectedCard = useMemo(
     () => cards.find(card => card.id === selectedCardId) || null,
@@ -118,7 +162,8 @@ export default function Brain() {
     void indexBrainSource(source).catch((error: any) => {
       console.warn(`Background ${label} memory update failed:`, error?.message || error);
       toast.warning(
-        `${label === 'card' ? 'Card' : 'Chat'} saved, but Brain memory update failed. Click "Rebuild Memory" to retry.`
+        `${label === 'card' ? 'Card' : 'Chat'} saved, but Brain memory update failed.`,
+        { description: error?.message || 'Click "Rebuild Memory" to retry.' }
       );
     });
   };
@@ -258,16 +303,30 @@ export default function Brain() {
     toast.success(`${extractedFile.format} added. Save when ready.`);
   };
 
-  const startNewChat = () => {
+  const resetActiveChat = () => {
+    const uid = auth.currentUser?.uid;
+    if (uid) clearBrainDraft(uid);
     setSelectedChatId('');
+    setQuestion('');
     setMessages([{ ...CHAT_WELCOME, createdAt: Date.now() }]);
   };
 
-  const saveCurrentChat = async () => {
+  const hasActiveDraft = () => hasBrainDraftContent({ messages, question });
+
+  const requestNewChat = () => {
+    if (hasActiveDraft()) {
+      setIsNewChatDialogOpen(true);
+      return;
+    }
+
+    resetActiveChat();
+  };
+
+  const saveCurrentChat = async (): Promise<BrainChat | null> => {
     const realMessages = messages.filter(message => message.id !== 'brain_welcome');
     if (realMessages.length === 0) {
       toast.error('Ask something before saving this chat.');
-      return;
+      return null;
     }
 
     const now = Date.now();
@@ -285,21 +344,50 @@ export default function Brain() {
       updatedAt: now,
     };
 
-    await db.saveBrainChat(chat);
-    setSavedChats(prev => [chat, ...prev.filter(item => item.id !== chat.id)]);
-    setSelectedChatId(chat.id);
-    toast.success('Brain chat saved.');
-    indexInBackground(chatToMemorySource(chat), 'chat');
+    try {
+      await db.saveBrainChat(chat);
+      setSavedChats(prev => [chat, ...prev.filter(item => item.id !== chat.id)]);
+      setSelectedChatId(chat.id);
+      toast.success('Brain chat saved.');
+      indexInBackground(chatToMemorySource(chat), 'chat');
+      return chat;
+    } catch (error: any) {
+      toast.error(error?.message || 'Could not save Brain chat.');
+      return null;
+    }
+  };
+
+  const saveDraftAndStartNewChat = async () => {
+    const saved = await saveCurrentChat();
+    if (!saved) return;
+
+    resetActiveChat();
+    setIsNewChatDialogOpen(false);
+  };
+
+  const discardDraftAndStartNewChat = () => {
+    resetActiveChat();
+    setIsNewChatDialogOpen(false);
+    toast.message('Unsaved Brain draft discarded from this Mac.');
   };
 
   const loadSavedChat = (chat: BrainChat) => {
     setSelectedChatId(chat.id);
     setChatMode(chat.mode);
     setMessages(chat.messages.length > 0 ? chat.messages : [{ ...CHAT_WELCOME, createdAt: Date.now() }]);
+    setIsHistoryOpen(false);
   };
 
   const deleteSavedChat = async () => {
     if (!selectedChatId) {
+      if (hasActiveDraft()) {
+        if (window.confirm('Discard this unsaved Brain draft from this Mac?')) {
+          resetActiveChat();
+          toast.message('Unsaved Brain draft discarded from this Mac.');
+        }
+        return;
+      }
+
       toast.error('Open a saved chat first.');
       return;
     }
@@ -315,7 +403,7 @@ export default function Brain() {
       });
 
       setSavedChats(prev => prev.filter(item => item.id !== chat.id));
-      startNewChat();
+      resetActiveChat();
       toast.success('Saved chat deleted');
     } catch (error: any) {
       toast.error(error.message || 'Could not delete saved chat.');
@@ -325,6 +413,7 @@ export default function Brain() {
   const rebuildMemory = async () => {
     setIsIndexing(true);
     try {
+      requireBrainMemoryGeminiKey();
       const currentUser = auth.currentUser;
       if (!currentUser) {
         throw new Error('Sign in again before rebuilding Brain memory.');
@@ -360,6 +449,12 @@ export default function Brain() {
   // entries from the period before delete-paths cascaded into Brain memory).
   const resetAndRebuildMemory = async () => {
     if (isResetting || isIndexing) return;
+    try {
+      requireBrainMemoryGeminiKey();
+    } catch (error: any) {
+      toast.error(error?.message || 'Configure a Gemini API key before resetting Brain memory.');
+      return;
+    }
     const confirmed = window.confirm(
       'Reset Brain memory and rebuild from scratch?\n\n' +
       'This wipes every Supabase row stored for your account and then re-indexes ' +
@@ -462,6 +557,22 @@ export default function Brain() {
     const history = messages
       .filter(message => message.id !== 'brain_welcome')
       .map(message => ({ role: message.role, content: message.content }));
+    const hasBrainAiKey = hasGeminiKey() || hasOpenrouterKey();
+
+    if (chatMode === 'work' && !hasBrainAiKey) {
+      setMessages(prev => [...prev, {
+        id: `brain_${Date.now()}`,
+        role: 'brain',
+        content: getBrainResponse(nextQuestion, cardsForAnswer),
+        createdAt: Date.now(),
+        sources: passages.map(({ cardTitle }) => ({
+          title: cardTitle,
+          type: 'brain_card',
+        })),
+      }]);
+      setIsThinking(false);
+      return;
+    }
 
     try {
       const result = await askBrainAi({
@@ -514,7 +625,7 @@ export default function Brain() {
   };
 
   return (
-    <div className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-[1680px] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl border-3 border-black bg-[var(--color-neo-cyan)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
           <BrainIcon className="h-6 w-6 text-black stroke-[3]" />
@@ -527,7 +638,7 @@ export default function Brain() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_380px] xl:items-start">
+      <div className="brain-workspace-grid grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)] xl:items-start">
         <section className="space-y-4">
           <div className="neo-box bg-white p-4 space-y-3">
             <label className="text-sm font-bold uppercase text-black">New Card</label>
@@ -549,7 +660,7 @@ export default function Brain() {
             </Button>
           </div>
 
-          <div className="space-y-3 xl:max-h-[calc(100vh-260px)] xl:overflow-y-auto xl:pr-2">
+          <div className="max-h-[360px] space-y-3 overflow-y-auto pr-2 lg:max-h-[calc(100dvh-260px)]">
             {cards.length === 0 ? (
               <div className="neo-box bg-white p-4 text-sm font-bold text-zinc-500">
                 No Brain cards yet.
@@ -601,11 +712,9 @@ export default function Brain() {
                 </div>
               </div>
 
-              <Textarea
+              <RichMarkdownEditor
                 value={draftContent}
-                onChange={(event) => setDraftContent(event.target.value)}
-                placeholder="Write your learning here. Keep headings, bullets, links, examples, and next actions in plain text."
-                className="mt-5 flex-1 min-h-[520px] resize-none rounded-none border-0 bg-white text-base leading-7 shadow-none focus-visible:ring-0"
+                onChange={setDraftContent}
               />
             </>
           ) : (
@@ -616,17 +725,65 @@ export default function Brain() {
           )}
         </section>
 
-        <Card className="neo-box flex h-[680px] min-h-0 flex-col overflow-hidden bg-white p-0 lg:col-span-2 lg:h-[720px] lg:max-h-[calc(100dvh-4rem)] xl:col-span-1 xl:h-[calc(100dvh-7rem)] xl:max-h-[900px] xl:sticky xl:top-4">
-          <CardHeader className="shrink-0 p-4 border-b-3 border-black bg-[var(--color-neo-pink)]">
+        <Card className="brain-chat-card neo-box flex min-h-0 flex-col overflow-hidden bg-white p-0 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-4">
+          <CardHeader className="shrink-0 p-4 border-b-3 border-black bg-[var(--color-neo-violet)]">
             <div className="flex items-center justify-between gap-3">
               <CardTitle className="flex items-center gap-2 text-black font-black uppercase">
                 <MessageCircle className="w-5 h-5 stroke-[3]" />
                 Brain Chat
               </CardTitle>
               <div className="flex flex-wrap gap-2">
-                <Button onClick={startNewChat} className="neo-btn bg-white text-black px-3" title="New chat">
+                <Button onClick={requestNewChat} className="neo-btn bg-white text-black px-3" title="New chat">
                   <Plus className="w-4 h-4 stroke-[3]" />
                 </Button>
+                <Popover open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        className="neo-btn bg-white px-3 text-black"
+                        title="Saved chats"
+                      />
+                    }
+                  >
+                    <History className="h-4 w-4 stroke-[3]" />
+                    <span className="hidden text-xs font-black sm:inline">{savedChats.length}</span>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    sideOffset={8}
+                    className="neo-box w-[min(380px,calc(100vw-2rem))] border-3 border-black bg-white p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-3 border-b-3 border-black pb-2">
+                      <p className="flex items-center gap-2 text-xs font-black uppercase text-black">
+                        <History className="h-4 w-4 stroke-[3]" />
+                        Saved Chats
+                      </p>
+                      <span className="rounded-full border-2 border-black px-2 py-0.5 text-[10px] font-black text-black">
+                        {savedChats.length}
+                      </span>
+                    </div>
+                    {savedChats.length === 0 ? (
+                      <p className="rounded-lg border-3 border-black bg-white p-3 text-sm font-bold text-[var(--color-neo-muted)]">
+                        No saved chats yet.
+                      </p>
+                    ) : (
+                      <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+                        {savedChats.map(chat => (
+                          <button
+                            key={chat.id}
+                            onClick={() => loadSavedChat(chat)}
+                            className={`w-full rounded-lg border-3 border-black px-3 py-2 text-left transition-colors ${selectedChatId === chat.id ? 'bg-[var(--color-neo-green)]' : 'bg-white hover:bg-zinc-50'}`}
+                          >
+                            <span className="block truncate text-xs font-black uppercase text-black">{chat.title}</span>
+                            <span className="mt-1 block text-[11px] font-bold text-zinc-600">
+                              {formatDistanceToNow(chat.updatedAt, { addSuffix: true })}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
                 {canSummarize && (
                   <Button
                     onClick={summarizeOlderHistory}
@@ -645,75 +802,56 @@ export default function Brain() {
                 </Button>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {CHAT_MODES.map(mode => {
-                const ModeIcon = mode.icon;
-                return (
-                  <button
-                    key={mode.id}
-                    onClick={() => setChatMode(mode.id)}
-                    title={mode.help}
-                    className={`border-3 border-black rounded-lg p-2 text-left transition-all xl:min-h-[76px] xl:text-center ${chatMode === mode.id ? 'bg-[var(--color-neo-yellow)] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]' : 'bg-white'}`}
-                  >
-                    <span className="flex items-center gap-2 font-black text-xs uppercase text-black xl:justify-center xl:text-[11px]">
-                      <ModeIcon className="w-4 h-4 stroke-[3]" />
-                      {mode.label}
-                    </span>
-                    <span className={`mt-1 block text-[11px] font-bold xl:hidden ${chatMode === mode.id ? 'text-black' : 'text-[var(--color-neo-muted)]'}`}>
-                      {mode.help}
-                    </span>
-                    <span className={`mt-1 hidden text-[9px] font-bold leading-tight xl:block ${chatMode === mode.id ? 'text-black' : 'text-[var(--color-neo-muted)]'}`}>
-                      {COMPACT_CHAT_MODE_HELP[mode.id]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-4 flex gap-2">
-              <Button
-                onClick={rebuildMemory}
-                disabled={isIndexing || isResetting}
-                className="neo-btn bg-[var(--color-neo-cyan)] text-black flex-1"
-                title="Re-index everything (cards, chats, logs, DSPs, tags, profile). Cards & chats already auto-index on save — use this for Fleet/Logbook changes or to force a full reconcile."
-              >
-                <RefreshCw className={`w-4 h-4 stroke-[3] ${isIndexing ? 'animate-spin' : ''}`} />
-                {isIndexing ? 'Indexing…' : 'Rebuild Memory'}
-              </Button>
-              <Button
-                onClick={resetAndRebuildMemory}
-                disabled={isIndexing || isResetting}
-                className="neo-btn bg-white text-black px-3"
-                title="Wipe Brain memory and rebuild from scratch. Use this if chat sources still cite records you've deleted from Pulse."
-                aria-label="Reset Brain memory"
-              >
-                <Eraser className={`w-4 h-4 stroke-[3] ${isResetting ? 'animate-pulse' : ''}`} />
-              </Button>
+            <div className="brain-chat-control-row mt-4 grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {CHAT_MODES.map(mode => {
+                  const ModeIcon = mode.icon;
+                  return (
+                    <button
+                      key={mode.id}
+                      onClick={() => setChatMode(mode.id)}
+                      title={mode.help}
+                      aria-pressed={chatMode === mode.id}
+                      className={`border-3 border-black rounded-lg p-2 text-left transition-all xl:text-center ${chatMode === mode.id ? 'bg-[var(--color-neo-yellow)] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]' : 'bg-white'}`}
+                    >
+                      <span className="flex items-center gap-2 font-black text-xs uppercase text-black xl:justify-center xl:text-[11px]">
+                        <ModeIcon className="w-4 h-4 stroke-[3]" />
+                        {mode.label}
+                      </span>
+                      <span className={`mt-1 block text-[11px] font-bold xl:hidden ${chatMode === mode.id ? 'text-black' : 'text-[var(--color-neo-muted)]'}`}>
+                        {mode.help}
+                      </span>
+                      <span className={`mt-1 hidden text-[9px] font-bold leading-tight xl:block ${chatMode === mode.id ? 'text-black' : 'text-[var(--color-neo-muted)]'}`}>
+                        {COMPACT_CHAT_MODE_HELP[mode.id]}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex min-w-0 gap-2">
+                <Button
+                  onClick={rebuildMemory}
+                  disabled={isIndexing || isResetting}
+                  className="neo-btn bg-[var(--color-neo-cyan)] text-black flex-1"
+                  title="Re-index everything (cards, chats, logs, DSPs, tags, profile). Cards & chats already auto-index on save — use this for Fleet/Logbook changes or to force a full reconcile."
+                >
+                  <RefreshCw className={`w-4 h-4 stroke-[3] ${isIndexing ? 'animate-spin' : ''}`} />
+                  <span className="truncate">{isIndexing ? 'Indexing…' : 'Rebuild Memory'}</span>
+                </Button>
+                <Button
+                  onClick={resetAndRebuildMemory}
+                  disabled={isIndexing || isResetting}
+                  className="neo-btn bg-white text-black px-3"
+                  title="Wipe Brain memory and rebuild from scratch. Use this if chat sources still cite records you've deleted from Pulse."
+                  aria-label="Reset Brain memory"
+                >
+                  <Eraser className={`w-4 h-4 stroke-[3] ${isResetting ? 'animate-pulse' : ''}`} />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4">
-            {savedChats.length > 0 && (
-              <div className="shrink-0 space-y-2">
-                <p className="text-xs font-black uppercase text-black flex items-center gap-2">
-                  <History className="w-4 h-4 stroke-[3]" />
-                  Saved Chats
-                </p>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {savedChats.slice(0, 8).map(chat => (
-                    <button
-                      key={chat.id}
-                      onClick={() => loadSavedChat(chat)}
-                      className={`shrink-0 max-w-[180px] border-3 border-black rounded-lg px-3 py-2 text-left ${selectedChatId === chat.id ? 'bg-[var(--color-neo-green)]' : 'bg-white'}`}
-                    >
-                      <span className="block truncate text-xs font-black uppercase text-black">{chat.title}</span>
-                      <span className="block text-[11px] font-bold text-zinc-600 mt-1">
-                        {formatDistanceToNow(chat.updatedAt, { addSuffix: true })}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div ref={messagesScrollRef} className="min-h-0 flex-1 basis-0 space-y-3 overflow-y-auto overscroll-contain pr-1">
+            <div ref={messagesScrollRef} className="min-h-[260px] flex-1 basis-0 space-y-3 overflow-y-auto overscroll-contain pr-1">
               {messages.map(message => {
                 const hasWebSources = (message.webSources?.length ?? 0) > 0;
                 const hasPrivateSources = (message.sources?.length ?? 0) > 0;
@@ -821,6 +959,41 @@ export default function Brain() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isNewChatDialogOpen} onOpenChange={setIsNewChatDialogOpen}>
+        <DialogContent className="neo-box max-w-md border-4 border-black bg-white p-0" showCloseButton={false}>
+          <DialogHeader className="border-b-4 border-black bg-[var(--color-neo-yellow)] p-5">
+            <DialogTitle className="text-2xl font-black uppercase text-black">Start New Chat?</DialogTitle>
+            <DialogDescription className="font-bold text-black">
+              Your current Brain chat is only stored as one local draft on this Mac.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 p-5 text-sm font-bold text-zinc-700">
+            <p>Save it to Brain chats, discard it completely from this device, or cancel and keep working.</p>
+          </div>
+          <DialogFooter className="border-t-4 border-black bg-zinc-100 p-4">
+            <Button
+              onClick={() => setIsNewChatDialogOpen(false)}
+              className="neo-btn bg-white text-black"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={discardDraftAndStartNewChat}
+              className="neo-btn bg-red-500 text-white"
+            >
+              Discard
+            </Button>
+            <Button
+              onClick={saveDraftAndStartNewChat}
+              className="neo-btn bg-[var(--color-neo-green)] text-black"
+            >
+              <Save className="h-4 w-4 stroke-[3]" />
+              Save Current
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

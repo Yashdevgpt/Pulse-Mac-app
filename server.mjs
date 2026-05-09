@@ -376,7 +376,7 @@ const getAiKeysFromReq = (req) => ({
 const requireGeminiKey = (req) => {
   const { geminiKey } = getAiKeysFromReq(req);
   if (!geminiKey) {
-    const error = new Error('Gemini API key is not set.');
+    const error = new Error('Gemini API key is required for Brain memory indexing because embeddings are Gemini-only.');
     error.status = 412;
     throw error;
   }
@@ -543,10 +543,33 @@ const isBrainMemorySourceTypeError = (error) => {
   );
 };
 
+const isBrainMemoryNetworkError = (error) => {
+  const code = String(error?.code || error?.cause?.code || '').toUpperCase();
+  const details = `${error?.message || ''} ${error?.cause?.message || ''}`.toLowerCase();
+  return (
+    code === 'ENOTFOUND' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNRESET' ||
+    details.includes('fetch failed') ||
+    details.includes('network')
+  );
+};
+
 const normalizeBrainMemoryError = (error) => {
   if (!error) return error;
   if (error.code === 'BRAIN_MEMORY_SCHEMA_MISSING') return error;
   if (error.code === 'BRAIN_MEMORY_SOURCE_TYPES_OUTDATED') return error;
+  if (error.code === 'BRAIN_MEMORY_UNREACHABLE') return error;
+  if (isBrainMemoryNetworkError(error)) {
+    const normalized = new Error(
+      'Supabase Brain memory is unreachable. Check VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and network/DNS access, then restart Pulse.'
+    );
+    normalized.status = 500;
+    normalized.code = 'BRAIN_MEMORY_UNREACHABLE';
+    normalized.cause = error;
+    return normalized;
+  }
   if (isBrainMemorySourceTypeError(error)) {
     const normalized = new Error(
       `Brain memory source types are outdated in Supabase. Apply ${brainMemorySourceTypesMigrationPath}, then retry the request.`
@@ -950,6 +973,7 @@ app.post('/api/brain/index', rateLimit, async (req, res) => {
   try {
     const user = await verifyFirebaseUser(req);
     enforceUserRateLimit(user, res);
+    requireGeminiKey(req);
     const sources = Array.isArray(req.body?.sources) ? req.body.sources : [];
     if (sources.length === 0) {
       return jsonError(res, 400, 'sources is required and must be a non-empty array.');
@@ -980,7 +1004,7 @@ app.post('/api/brain/index', rateLimit, async (req, res) => {
     const result = await indexSources(req, user.uid, sources);
     res.json(result);
   } catch (error) {
-    if (error.status !== 401) console.error('Brain index error:', error);
+    if (![401, 412].includes(error.status)) console.error('Brain index error:', error);
     jsonError(res, error.status || 500, error.message || 'Brain indexing failed.');
   }
 });
@@ -1030,6 +1054,15 @@ app.post('/api/brain/reset-memory', rateLimit, async (req, res) => {
 });
 
 app.post('/api/brain/chat', rateLimit, async (req, res) => {
+  let user;
+  try {
+    user = await verifyFirebaseUser(req);
+    enforceUserRateLimit(user, res);
+  } catch (error) {
+    if (error.status !== 401) console.error('Brain chat error:', error);
+    return jsonError(res, error.status || 500, error.message || 'Brain chat failed.');
+  }
+
   const { geminiKey, openrouterKey } = getAiKeysFromReq(req);
   const question = String(req.body?.question || '').trim().slice(0, MAX_QUESTION_LENGTH);
   const mode = ['work', 'work_web', 'web'].includes(req.body?.mode) ? req.body.mode : 'work';
@@ -1062,8 +1095,6 @@ app.post('/api/brain/chat', rateLimit, async (req, res) => {
   }
 
   try {
-    const user = await verifyFirebaseUser(req);
-    enforceUserRateLimit(user, res);
     let memorySources = [];
     let recentSources = [];
     const questionProfile = getQuestionSourceProfile(question);
@@ -1210,7 +1241,7 @@ app.post('/api/brain/summarize-history', rateLimit, async (req, res) => {
       compressedCount: messages.length,
     });
   } catch (error) {
-    if (error.status !== 401) console.error('Brain summarize-history error:', error);
+    if (![401, 412].includes(error.status)) console.error('Brain summarize-history error:', error);
     jsonError(res, error.status || 500, error.message || 'Could not summarize chat history.');
   }
 });

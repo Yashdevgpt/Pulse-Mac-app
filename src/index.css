@@ -2,7 +2,7 @@
 
 @theme {
   --color-neo-yellow: #ffc900;
-  --color-neo-pink: #ff90e8;
+  --color-neo-violet: #9b7cff;
   --color-neo-cyan: #00f0ff;
   --color-neo-green: #00ff00;
   --color-neo-bg: #f4f4f0;
@@ -143,7 +143,7 @@
 
 .dark {
     --color-neo-yellow: #9c8400;
-    --color-neo-pink: #9d5f8f;
+    --color-neo-violet: #4c3d95;
     --color-neo-cyan: #157f8d;
     --color-neo-green: #1e8e4a;
     --color-neo-bg: #10141c;
@@ -312,4 +312,118 @@ textarea:-webkit-autofill:focus {
 
 .app-no-drag {
   -webkit-app-region: no-drag;
+}
+
+.rich-card-editor {
+  height: clamp(360px, calc(100dvh - 360px), 620px);
+  overscroll-behavior: contain;
+}
+
+.rich-card-editor:empty::before {
+  color: var(--color-neo-muted);
+  content: "Write your learning here.";
+  font-weight: 700;
+}
+
+.rich-card-editor h1 {
+  font-size: 1.875rem;
+  font-weight: 900;
+  line-height: 1.1;
+  margin: 0 0 1rem;
+  text-transform: uppercase;
+}
+
+.rich-card-editor h2 {
+  font-size: 1.375rem;
+  font-weight: 900;
+  line-height: 1.2;
+  margin: 0 0 0.875rem;
+}
+
+.rich-card-editor p,
+.rich-card-editor blockquote,
+.rich-card-editor ul,
+.rich-card-editor ol {
+  margin: 0 0 1rem;
+}
+
+.rich-card-editor ul,
+.rich-card-editor ol {
+  padding-left: 1.5rem;
+}
+
+.rich-card-editor ul {
+  list-style: disc;
+}
+
+.rich-card-editor ol {
+  list-style: decimal;
+}
+
+.rich-card-editor blockquote {
+  border-left: 4px solid black;
+  font-style: italic;
+  padding-left: 1rem;
+}
+
+.rich-card-editor code {
+  background: rgb(0 0 0 / 0.1);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  padding: 0.125rem 0.25rem;
+}
+
+.rich-card-editor a {
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.brain-chat-card {
+  height: clamp(560px, calc(100dvh - 9rem), 900px);
+  max-height: none;
+}
+
+@media (min-width: 80rem) {
+  .brain-workspace-grid {
+    grid-template-columns: 260px minmax(0, 1fr) 380px;
+  }
+
+  .pulse-nav-closed .brain-workspace-grid {
+    grid-template-columns: 260px minmax(360px, 1fr) minmax(500px, 0.9fr);
+  }
+
+  .brain-chat-control-row {
+    grid-template-columns: minmax(0, 1fr) minmax(176px, 220px);
+  }
+
+  .brain-chat-card {
+    height: clamp(620px, calc(100dvh - 8rem), 940px);
+  }
+
+  .pulse-nav-closed .brain-chat-card {
+    height: clamp(660px, calc(100dvh - 7rem), 980px);
+  }
+}
+
+@media (min-width: 96rem) {
+  .brain-workspace-grid {
+    grid-template-columns: 260px minmax(420px, 1fr) minmax(440px, 0.75fr);
+  }
+
+  .pulse-nav-closed .brain-workspace-grid {
+    grid-template-columns: 280px minmax(520px, 1fr) minmax(580px, 0.75fr);
+  }
+
+  .pulse-nav-closed .brain-chat-card {
+    height: clamp(700px, calc(100dvh - 8rem), 1000px);
+  }
+}
+
+@media (max-height: 760px) {
+  .brain-chat-card,
+  .pulse-nav-closed .brain-chat-card {
+    height: clamp(500px, calc(100dvh - 12rem), 560px);
+  }
 }

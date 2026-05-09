@@ -1,5 +1,5 @@
 import { firestore, auth } from './firebase';
-import { collection, doc, getDocs, getDoc, setDoc, deleteDoc, query, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, deleteDoc, query, orderBy, writeBatch, where, type QueryConstraint } from 'firebase/firestore';
 
 export interface DSP {
   id: string;
@@ -99,6 +99,23 @@ export interface WatchtowerPreferences {
   updatedAt: number;
 }
 
+export interface ExportDateRange {
+  startMs?: number;
+  endMs?: number;
+}
+
+const dateRangeConstraints = (field: string, range?: ExportDateRange): QueryConstraint[] => {
+  const constraints: QueryConstraint[] = [];
+  if (typeof range?.startMs === 'number') {
+    constraints.push(where(field, '>=', range.startMs));
+  }
+  if (typeof range?.endMs === 'number') {
+    constraints.push(where(field, '<=', range.endMs));
+  }
+  constraints.push(orderBy(field, 'desc'));
+  return constraints;
+};
+
 export const db = {
   // User Management
   getUserAccess: async (user: any): Promise<AppUser> => {
@@ -133,6 +150,25 @@ export const db = {
   getAllUsers: async (): Promise<AppUser[]> => {
     const snapshot = await getDocs(collection(firestore, 'app_users'));
     return snapshot.docs.map(d => d.data() as AppUser);
+  },
+  getCurrentUserProfileReadOnly: async (): Promise<AppUser> => {
+    const currentUser = auth.currentUser;
+    const uid = getUid();
+    const userSnap = await getDoc(doc(firestore, `app_users/${uid}`));
+    if (userSnap.exists()) {
+      return userSnap.data() as AppUser;
+    }
+
+    const email = (currentUser?.email || '').toLowerCase();
+    return {
+      uid,
+      email,
+      name: currentUser?.displayName || email.split('@')[0] || 'Unknown User',
+      status: 'pending',
+      createdAt: currentUser?.metadata?.creationTime
+        ? new Date(currentUser.metadata.creationTime).getTime()
+        : Date.now(),
+    };
   },
   updateUserStatus: async (uid: string, status: 'pending' | 'approved' | 'admin' | 'rejected'): Promise<void> => {
     await setDoc(doc(firestore, `app_users/${uid}`), { status }, { merge: true });
@@ -197,6 +233,11 @@ export const db = {
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => d.data() as Log);
   },
+  getLogsForExport: async (range?: ExportDateRange): Promise<Log[]> => {
+    const q = query(collection(firestore, `users/${getUid()}/logs`), ...dateRangeConstraints('createdAt', range));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => d.data() as Log);
+  },
   getLogsByDSP: async (dspId: string): Promise<Log[]> => {
     const logs = await db.getLogs();
     return logs.filter(log => log.dspId === dspId);
@@ -225,6 +266,10 @@ export const db = {
     }
     return snapshot.docs.map(d => d.data() as Tag);
   },
+  getTagsReadOnly: async (): Promise<Tag[]> => {
+    const snapshot = await getDocs(collection(firestore, `users/${getUid()}/tags`));
+    return snapshot.docs.map(d => d.data() as Tag);
+  },
   saveTag: async (tag: Tag): Promise<Tag> => {
     await setDoc(doc(firestore, `users/${getUid()}/tags/${tag.id}`), tag);
     return tag;
@@ -236,6 +281,11 @@ export const db = {
   // Brain
   getBrainCards: async (): Promise<BrainCard[]> => {
     const q = query(collection(firestore, `users/${getUid()}/brainCards`), orderBy('updatedAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => d.data() as BrainCard);
+  },
+  getBrainCardsForExport: async (range?: ExportDateRange): Promise<BrainCard[]> => {
+    const q = query(collection(firestore, `users/${getUid()}/brainCards`), ...dateRangeConstraints('updatedAt', range));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => d.data() as BrainCard);
   },
