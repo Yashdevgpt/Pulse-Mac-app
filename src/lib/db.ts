@@ -1,5 +1,5 @@
 import { firestore, auth } from './firebase';
-import { collection, doc, getDocs, getDoc, setDoc, deleteDoc, query, orderBy, writeBatch, where, type QueryConstraint } from 'firebase/firestore';
+import { collection, doc, getCountFromServer, getDocs, getDoc, setDoc, deleteDoc, query, orderBy, writeBatch, where, type QueryConstraint } from 'firebase/firestore';
 
 export interface DSP {
   id: string;
@@ -233,14 +233,38 @@ export const db = {
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => d.data() as Log);
   },
+  getLog: async (id: string): Promise<Log | null> => {
+    const d = await getDoc(doc(firestore, `users/${getUid()}/logs/${id}`));
+    return d.exists() ? (d.data() as Log) : null;
+  },
+  getLogsByStatus: async (status: Log['status']): Promise<Log[]> => {
+    const q = query(collection(firestore, `users/${getUid()}/logs`), where('status', '==', status));
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map(d => d.data() as Log)
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+  },
   getLogsForExport: async (range?: ExportDateRange): Promise<Log[]> => {
     const q = query(collection(firestore, `users/${getUid()}/logs`), ...dateRangeConstraints('createdAt', range));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => d.data() as Log);
   },
   getLogsByDSP: async (dspId: string): Promise<Log[]> => {
-    const logs = await db.getLogs();
-    return logs.filter(log => log.dspId === dspId);
+    const q = query(collection(firestore, `users/${getUid()}/logs`), where('dspId', '==', dspId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map(d => d.data() as Log)
+      .sort((left, right) => right.createdAt - left.createdAt);
+  },
+  getLogCountsByDSPs: async (dspIds: string[]): Promise<Record<string, number>> => {
+    const uid = getUid();
+    const uniqueDspIds = Array.from(new Set(dspIds));
+    const entries = await Promise.all(uniqueDspIds.map(async (dspId) => {
+      const q = query(collection(firestore, `users/${uid}/logs`), where('dspId', '==', dspId));
+      const snapshot = await getCountFromServer(q);
+      return [dspId, snapshot.data().count] as const;
+    }));
+    return Object.fromEntries(entries);
   },
   saveLog: async (log: Log): Promise<Log> => {
     await setDoc(doc(firestore, `users/${getUid()}/logs/${log.id}`), log);

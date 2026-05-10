@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { db, DSP, Log } from '@/lib/db';
+import { db, DSP } from '@/lib/db';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,8 @@ import { deleteBrainMemorySource } from '@/lib/brainApi';
 
 export default function Fleet() {
   const [dsps, setDsps] = useState<DSP[]>([]);
-  const [logs, setLogs] = useState<Log[]>([]);
+  const [logCountsByDsp, setLogCountsByDsp] = useState<Record<string, number>>({});
+  const [ongoingCountsByDsp, setOngoingCountsByDsp] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [editingDspId, setEditingDspId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -22,10 +23,19 @@ export default function Fleet() {
   }, []);
 
   const loadData = async () => {
-    const loadedDsps = await db.getDSPs();
-    const loadedLogs = await db.getLogs();
+    const [loadedDsps, ongoingLogs] = await Promise.all([
+      db.getDSPs(),
+      db.getLogsByStatus('Ongoing'),
+    ]);
+    const loadedLogCounts = await db.getLogCountsByDSPs(loadedDsps.map(dsp => dsp.id));
+    const loadedOngoingCounts = ongoingLogs.reduce<Record<string, number>>((counts, log) => {
+      counts[log.dspId] = (counts[log.dspId] || 0) + 1;
+      return counts;
+    }, {});
+
     setDsps(loadedDsps);
-    setLogs(loadedLogs);
+    setLogCountsByDsp(loadedLogCounts);
+    setOngoingCountsByDsp(loadedOngoingCounts);
   };
 
   // Starred DSPs always appear first. Within each group (starred / not),
@@ -60,11 +70,9 @@ export default function Fleet() {
   };
 
   const getDspStats = (dspId: string) => {
-    const dspLogs = logs.filter(l => l.dspId === dspId);
-    const ongoing = dspLogs.filter(l => l.status === 'Ongoing').length;
     return {
-      totalLogs: dspLogs.length,
-      ongoingTasks: ongoing
+      totalLogs: logCountsByDsp[dspId] || 0,
+      ongoingTasks: ongoingCountsByDsp[dspId] || 0
     };
   };
 
@@ -109,7 +117,7 @@ export default function Fleet() {
     // memory entries. Runs before db.deleteDSP() so getLogsByDSP still finds
     // them. Failures are non-fatal — Reset Memory on the Brain page is the
     // safety net.
-    const dspLogs = logs.filter(log => log.dspId === dsp.id);
+    const dspLogs = await db.getLogsByDSP(dsp.id);
     const brainCleanups = [
       deleteBrainMemorySource('dsp_record', dsp.id),
       ...dspLogs.map(log => deleteBrainMemorySource('fleet_log', log.id)),
@@ -123,7 +131,14 @@ export default function Fleet() {
 
     await db.deleteDSP(dsp.id);
     setDsps(prev => prev.filter(item => item.id !== dsp.id));
-    setLogs(prev => prev.filter(log => log.dspId !== dsp.id));
+    setLogCountsByDsp(prev => {
+      const { [dsp.id]: _removed, ...rest } = prev;
+      return rest;
+    });
+    setOngoingCountsByDsp(prev => {
+      const { [dsp.id]: _removed, ...rest } = prev;
+      return rest;
+    });
     toast.success('DSP deleted');
   };
 

@@ -388,3 +388,57 @@
   - 2026-05-09, before 17:13 IST: Navbar duplicate-controls issue fixed by moving to one manual sidebar toggle and one sidebar-only theme control.
   - 2026-05-09, before 17:13 IST: Brain Chat was widened in the closed-navbar workspace and Saved Chats moved to the History popover.
   - 2026-05-10, 03:24 IST: PRD updated after user approval to push the latest changes.
+
+### 2026-05-11 - Supabase Security Advisor Hardening
+- **Approval:** User approved documenting and keeping the architecture-aligned fix after reviewing the Supabase linter warnings and confirming Pulse's Supabase role is vector memory only.
+- **Reason:** Supabase reported `rls_enabled_no_policy` on `public.brain_chunks`, `function_search_path_mutable` on `public.match_brain_chunks`, and `extension_in_public` for `vector`. The fix needed to preserve Pulse's architecture: Firebase remains the application database, Supabase stores only Brain vector memory, the cron-job.org keep-alive uses the anon key, and the local Pulse server uses the Supabase `service_role` key for actual indexing and retrieval.
+- **Changes:**
+  - Added `supabase/migrations/20260511000000_harden_brain_memory_security.sql` to harden the live Brain memory schema.
+  - Left `public.brain_chunks` with RLS enabled and no client policies as an intentional default-deny state. Publishable/anon requests can reach the endpoint for keep-alive but cannot read vector rows; service-role server calls continue to perform real memory operations.
+  - Recreated `public.match_brain_chunks` with a locked `search_path` and qualified table access to reduce schema-spoofing risk.
+  - Revoked direct RPC execution from `public`, `anon`, and `authenticated`, and granted execution to `service_role`.
+  - Made the `vector` extension move non-destructive: the migration tries to move it into `extensions`, but logs a notice and leaves it in place if Supabase rejects the move on an active project.
+  - Updated `supabase/brain_memory.sql`, the baseline Brain memory migration, and `README.md` so fresh setup and operator docs describe the intentional RLS default-deny posture.
+- **Operational notes:**
+  - The user applied `supabase/migrations/20260511000000_harden_brain_memory_security.sql` in Supabase SQL Editor after approval.
+  - Supabase Security Advisor showed `0` warnings after the migration. The remaining `rls_enabled_no_policy` info suggestion is intentional for Pulse's default-deny vector memory table.
+  - If `rls_enabled_no_policy` remains visible, leave it documented as accepted behavior unless the architecture changes to require direct client reads from `brain_chunks`.
+- **Logs:**
+  - Live Supabase REST probe with anon/publishable key returned `HTTP 200` with `0` visible rows.
+  - Live Supabase REST probe with `service_role` key returned `HTTP 200` with `1` visible row.
+  - Live Supabase `match_brain_chunks` RPC probe with `service_role` returned `HTTP 200` with `0` rows for a synthetic no-real-user query, confirming the function still executes after hardening.
+  - `git diff --check` passed.
+  - `node --check server.mjs` passed.
+  - `npm run lint` passed.
+  - `npm run build` passed with the existing Vite large chunk warning only.
+- **Timeline:**
+  - 2026-05-11, before 00:37 IST: Reviewed Supabase Security Advisor warnings against Pulse's Firebase + Supabase-vector-memory architecture.
+  - 2026-05-11, before 00:37 IST: Added the architecture-aligned Supabase hardening migration and updated SQL/README setup docs.
+  - 2026-05-11, 00:37 IST: PRD updated after user approval.
+  - 2026-05-11, 00:44 IST: PRD updated after the user applied the live Supabase migration and live REST/RPC checks passed.
+
+### 2026-05-11 - Local-Use Performance and API Hardening
+- **Approval:** User confirmed the app will be used solely by the owner, approved fixing the non-functional testing findings without breaking Pulse, and then approved this PRD update before pushing to GitHub.
+- **Reason:** Non-functional testing found that the production-runtime dependency advisories could be patched safely, Brain API token handling should not accept tokens from request bodies, the local server should expose fewer browser/security weaknesses, and the Brain/log-heavy screens needed the already-implemented containment/query work documented before push.
+- **Changes:**
+  - **Local server hardening:** Disabled Express `X-Powered-By` and added lightweight response headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and a restrictive camera/microphone/geolocation `Permissions-Policy`.
+  - **Brain auth hardening:** Removed the `req.body.authToken` fallback in `server.mjs`. Brain API calls now rely on the existing `Authorization: Bearer <Firebase token>` path used by `src/lib/brainApi.ts`.
+  - **Safe dependency cleanup:** Ran `npm audit fix` without `--force`, updating transitive packages such as `protobufjs`, `postcss`, `express-rate-limit`, `ip-address`, `hono`, and `fast-uri` through `package-lock.json`. Major Electron/electron-builder upgrades were intentionally not forced because this is a single-user local app and a forced desktop-runtime jump has a higher breakage risk.
+  - **Brain layout containment:** Kept the desktop Brain route inside a bounded shell/grid so long cards and Brain Chat scroll internally instead of stretching the page, and so the editor/chat columns align more predictably.
+  - **Log/Fleet performance path:** Shifted Fleet, Watchtower, and Logbook away from avoidable all-log reads where possible. Logbook now queries logs by DSP and groups/filtering work is memoized; Fleet uses count queries for per-DSP log totals; Watchtower loads only ongoing logs for its alert surface.
+- **Operational notes:**
+  - The active local development server is running on `http://localhost:3000` bound to `127.0.0.1`.
+  - `npm audit --omit=dev` now reports `0` vulnerabilities. Full `npm audit` still reports Electron/electron-builder packaging warnings that require major upgrades; these are deferred until the app is intended for wider distribution.
+  - No CSP header was added in this pass because Pulse currently depends on local Vite/Electron plus Firebase/Supabase/AI-provider connections; a strict CSP needs a separate allowlist pass to avoid breaking normal local use.
+- **Logs:**
+  - `node --check server.mjs` passed.
+  - `npm run lint` passed.
+  - `npm run build` passed with the existing Vite large chunk warning only.
+  - `npm audit --omit=dev` returned `found 0 vulnerabilities`.
+  - `git diff --check` passed.
+  - Route smoke on `http://localhost:3000` returned `HTTP 200` for `/`, `/fleet`, `/brain`, `/watchtower`, `/archive`, `/admin`, and `/logbook/tunnl`.
+  - Header/auth smoke on `http://localhost:3000` confirmed `X-Powered-By` is absent, the new hardening headers are present, and a body-only fake `authToken` returns `HTTP 401`.
+- **Timeline:**
+  - 2026-05-11, after 01:15 IST: Completed non-functional performance/security testing and ranked findings for single-user local use.
+  - 2026-05-11, after 01:25 IST: Applied safe local hardening changes and non-breaking dependency audit fixes.
+  - 2026-05-11, after 01:35 IST: Restarted the local server, verified route/header/auth behavior, and documented the approved PRD update before GitHub push.

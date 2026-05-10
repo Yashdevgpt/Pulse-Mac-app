@@ -61,6 +61,7 @@ export default function Brain() {
   const [isResetting, setIsResetting] = useState(false);
   const [isNewChatDialogOpen, setIsNewChatDialogOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isResetMemoryDialogOpen, setIsResetMemoryDialogOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([CHAT_WELCOME]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftRestoredRef = useRef(false);
@@ -443,11 +444,15 @@ export default function Brain() {
     }
   };
 
+  const requestResetMemory = () => {
+    if (isResetting || isIndexing) return;
+    setIsResetMemoryDialogOpen(true);
+  };
+
   // "Hard reset" — wipes every Supabase brain_chunks row owned by this user
-  // and then re-indexes from current Firestore state. Use this when chat
-  // sources cite records that have been deleted from Pulse (i.e. orphan
-  // entries from the period before delete-paths cascaded into Brain memory).
-  const resetAndRebuildMemory = async () => {
+  // and then re-indexes from current Firestore state. It does not delete the
+  // Firestore product records that the vector memory is rebuilt from.
+  const confirmResetAndRebuildMemory = async () => {
     if (isResetting || isIndexing) return;
     try {
       requireBrainMemoryGeminiKey();
@@ -455,21 +460,19 @@ export default function Brain() {
       toast.error(error?.message || 'Configure a Gemini API key before resetting Brain memory.');
       return;
     }
-    const confirmed = window.confirm(
-      'Reset Brain memory and rebuild from scratch?\n\n' +
-      'This wipes every Supabase row stored for your account and then re-indexes ' +
-      'from the current Fleet, Brain cards, and saved chats. Use it if chat ' +
-      'sources still cite deleted records.'
-    );
-    if (!confirmed) return;
 
     setIsResetting(true);
     try {
       const result = await resetBrainMemory();
-      toast.success(`Wiped ${result.deleted} memory chunk${result.deleted === 1 ? '' : 's'}. Rebuilding…`);
+      setIsResetMemoryDialogOpen(false);
+      toast.success(`Wiped ${result.deleted} memory chunk${result.deleted === 1 ? '' : 's'}. Rebuilding…`, {
+        description: 'Your Brain cards, saved chats, Fleet, logs, tags, and profile records were not deleted.',
+      });
       await rebuildMemory();
     } catch (error: any) {
-      toast.error(error.message || 'Could not reset Brain memory.');
+      toast.error(error.message || 'Could not reset Brain memory.', {
+        description: 'No Pulse product data was changed. Fix Supabase/network access, then retry.',
+      });
     } finally {
       setIsResetting(false);
     }
@@ -625,8 +628,8 @@ export default function Brain() {
   };
 
   return (
-    <div className="mx-auto max-w-[1680px] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-6 flex items-center gap-4">
+    <div className="brain-page mx-auto flex w-full max-w-[1680px] flex-col px-4 py-6 sm:px-6 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-8">
+      <div className="mb-6 flex shrink-0 items-center gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl border-3 border-black bg-[var(--color-neo-cyan)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
           <BrainIcon className="h-6 w-6 text-black stroke-[3]" />
         </div>
@@ -638,8 +641,8 @@ export default function Brain() {
         </div>
       </div>
 
-      <div className="brain-workspace-grid grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)] xl:items-start">
-        <section className="space-y-4">
+      <div className="brain-workspace-grid grid grid-cols-1 gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[260px_minmax(0,1fr)] xl:items-stretch">
+        <section className="flex min-h-0 flex-col gap-4">
           <div className="neo-box bg-white p-4 space-y-3">
             <label className="text-sm font-bold uppercase text-black">New Card</label>
             <Input
@@ -660,7 +663,7 @@ export default function Brain() {
             </Button>
           </div>
 
-          <div className="max-h-[360px] space-y-3 overflow-y-auto pr-2 lg:max-h-[calc(100dvh-260px)]">
+          <div className="max-h-[360px] space-y-3 overflow-y-auto pr-2 lg:max-h-none lg:min-h-0 lg:flex-1">
             {cards.length === 0 ? (
               <div className="neo-box bg-white p-4 text-sm font-bold text-zinc-500">
                 No Brain cards yet.
@@ -682,7 +685,7 @@ export default function Brain() {
           </div>
         </section>
 
-        <section className="neo-box flex min-h-[620px] flex-col bg-white p-5">
+        <section className="neo-box flex min-h-[620px] flex-col bg-white p-5 lg:h-full lg:min-h-0 lg:overflow-hidden">
           {selectedCard ? (
             <>
               <div className="flex flex-col gap-3 border-b-3 border-black pb-4 md:flex-row md:items-center md:justify-between">
@@ -725,7 +728,7 @@ export default function Brain() {
           )}
         </section>
 
-        <Card className="brain-chat-card neo-box flex min-h-0 flex-col overflow-hidden bg-white p-0 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-4">
+        <Card className="brain-chat-card neo-box flex min-h-0 flex-col overflow-hidden bg-white p-0 lg:col-span-2 lg:h-full">
           <CardHeader className="shrink-0 p-4 border-b-3 border-black bg-[var(--color-neo-violet)]">
             <div className="flex items-center justify-between gap-3">
               <CardTitle className="flex items-center gap-2 text-black font-black uppercase">
@@ -839,10 +842,10 @@ export default function Brain() {
                   <span className="truncate">{isIndexing ? 'Indexing…' : 'Rebuild Memory'}</span>
                 </Button>
                 <Button
-                  onClick={resetAndRebuildMemory}
+                  onClick={requestResetMemory}
                   disabled={isIndexing || isResetting}
                   className="neo-btn bg-white text-black px-3"
-                  title="Wipe Brain memory and rebuild from scratch. Use this if chat sources still cite records you've deleted from Pulse."
+                  title="Reset the Supabase vector index and rebuild it from current Pulse records."
                   aria-label="Reset Brain memory"
                 >
                   <Eraser className={`w-4 h-4 stroke-[3] ${isResetting ? 'animate-pulse' : ''}`} />
@@ -990,6 +993,54 @@ export default function Brain() {
             >
               <Save className="h-4 w-4 stroke-[3]" />
               Save Current
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isResetMemoryDialogOpen} onOpenChange={setIsResetMemoryDialogOpen}>
+        <DialogContent className="neo-box max-w-lg border-4 border-black bg-white p-0" showCloseButton={false}>
+          <DialogHeader className="border-b-4 border-black bg-[var(--color-neo-yellow)] p-5">
+            <DialogTitle className="text-2xl font-black uppercase text-black">Reset Brain Memory?</DialogTitle>
+            <DialogDescription className="font-bold text-black">
+              This repairs the AI search index used by Brain Chat. It does not delete your actual Pulse records.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 p-5 text-sm font-bold text-zinc-700">
+            <div>
+              <p className="mb-2 text-xs font-black uppercase tracking-wide text-black">What it will do</p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Delete only your Supabase `brain_chunks` rows, which are AI memory/index copies.</li>
+                <li>Rebuild that memory from your current profile, Fleet DSPs, logs, tags, Brain cards, and saved chats.</li>
+                <li>Fix cases where Brain Chat still cites old records you already deleted.</li>
+              </ul>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-black uppercase tracking-wide text-black">What it will not delete</p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Your Brain cards, saved chats, Fleet data, logs, tags, profile, attachments, and AI keys stay in place.</li>
+                <li>It does not clear local chat drafts or browser storage.</li>
+              </ul>
+            </div>
+            <p className="rounded-lg border-3 border-black bg-[var(--color-neo-cyan)]/20 p-3 text-black">
+              Requires a Gemini key because rebuilding uses Gemini embeddings. If Supabase is unreachable, nothing is reset and you can retry after fixing the connection.
+            </p>
+          </div>
+          <DialogFooter className="border-t-4 border-black bg-zinc-100 p-4">
+            <Button
+              onClick={() => setIsResetMemoryDialogOpen(false)}
+              disabled={isResetting || isIndexing}
+              className="neo-btn bg-white text-black"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmResetAndRebuildMemory}
+              disabled={isResetting || isIndexing}
+              className="neo-btn bg-red-500 text-white"
+            >
+              <Eraser className={`h-4 w-4 stroke-[3] ${isResetting ? 'animate-pulse' : ''}`} />
+              {isResetting ? 'Resetting…' : 'Reset & Rebuild'}
             </Button>
           </DialogFooter>
         </DialogContent>

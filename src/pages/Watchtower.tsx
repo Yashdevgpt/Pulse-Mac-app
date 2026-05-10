@@ -97,8 +97,8 @@ export default function Watchtower() {
   }, []);
 
   const loadData = async () => {
-    const [allLogs, allDsps, allTags, preferences] = await Promise.all([
-      db.getLogs(),
+    const [ongoingLogsOnly, allDsps, allTags, preferences] = await Promise.all([
+      db.getLogsByStatus('Ongoing'),
       db.getDSPs(),
       db.getTags(),
       db.getWatchtowerPreferences(),
@@ -114,13 +114,11 @@ export default function Watchtower() {
     setTags(allTags);
     setVisibleTagIds(nextVisibleTagIds);
 
-    const ongoing = allLogs
-      .filter(log => log.status === 'Ongoing')
+    const ongoing = ongoingLogsOnly
       .map(log => ({
         ...log,
         dspName: allDsps.find(dsp => dsp.id === log.dspId)?.name || 'Unknown DSP',
-      }))
-      .sort((left, right) => right.updatedAt - left.updatedAt);
+      }));
 
     setOngoingLogs(ongoing);
   };
@@ -248,7 +246,7 @@ export default function Watchtower() {
       return;
     }
 
-    const log = await db.getLogs().then(logs => logs.find(item => item.id === logId));
+    const log = await db.getLog(logId);
     if (!log) return;
 
     log.status = 'Completed';

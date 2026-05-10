@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db, DSP, Log, Tag } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { format, startOfWeek, endOfWeek, isSameWeek } from 'date-fns';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel } from 'docx';
 import { ArrowLeft, Search, Paperclip, MoreVertical, Trash2, Edit2, Calendar as CalendarIcon, Download } from 'lucide-react';
 import {
@@ -74,10 +74,11 @@ export default function Logbook() {
     }
     setDsp(loadedDsp);
     
-    const loadedLogs = await db.getLogsByDSP(loadedDsp.id);
+    const [loadedLogs, loadedTags] = await Promise.all([
+      db.getLogsByDSP(loadedDsp.id),
+      db.getTags(),
+    ]);
     setLogs(loadedLogs);
-    
-    const loadedTags = await db.getTags();
     setTags(loadedTags);
   };
 
@@ -94,7 +95,7 @@ export default function Logbook() {
       console.warn('Brain memory cleanup for fleet_log failed:', (error as Error)?.message || error);
     }
     await db.deleteLog(logId);
-    setLogs(logs.filter(l => l.id !== logId));
+    setLogs(prev => prev.filter(l => l.id !== logId));
     toast.success('Log deleted');
   };
 
@@ -149,7 +150,7 @@ export default function Logbook() {
           updatedAt: Date.now()
         };
         await db.saveLog(updatedLog);
-        setLogs(logs.map(l => l.id === updatedLog.id ? updatedLog : l));
+        setLogs(prev => prev.map(l => l.id === updatedLog.id ? updatedLog : l));
         toast.success('File attached');
       }
     };
@@ -314,25 +315,32 @@ export default function Logbook() {
   };
 
   // Filtering
-  const filteredLogs = logs.filter(log => {
+  const tagById = useMemo(() => new Map(tags.map(tag => [tag.id, tag])), [tags]);
+
+  const filteredLogs = useMemo(() => logs.filter(log => {
     const matchesSearch = log.content.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'All' || log.status === statusFilter;
     return matchesSearch && matchesStatus;
-  });
+  }), [logs, searchQuery, statusFilter]);
 
   // Group by week
-  const groupedLogs: { weekStart: Date; logs: Log[] }[] = [];
-  filteredLogs.forEach(log => {
-    const logDate = new Date(log.createdAt);
-    const weekStart = startOfWeek(logDate, { weekStartsOn: 1 }); // Monday start
-    
-    const existingGroup = groupedLogs.find(g => isSameWeek(g.weekStart, weekStart, { weekStartsOn: 1 }));
-    if (existingGroup) {
-      existingGroup.logs.push(log);
-    } else {
-      groupedLogs.push({ weekStart, logs: [log] });
+  const groupedLogs = useMemo(() => {
+    const groups = new Map<number, { weekStart: Date; logs: Log[] }>();
+
+    for (const log of filteredLogs) {
+      const weekStart = startOfWeek(new Date(log.createdAt), { weekStartsOn: 1 });
+      const weekKey = weekStart.getTime();
+      const existingGroup = groups.get(weekKey);
+
+      if (existingGroup) {
+        existingGroup.logs.push(log);
+      } else {
+        groups.set(weekKey, { weekStart, logs: [log] });
+      }
     }
-  });
+
+    return Array.from(groups.values()).sort((left, right) => right.weekStart.getTime() - left.weekStart.getTime());
+  }, [filteredLogs]);
 
   if (!dsp) return null;
 
@@ -488,7 +496,7 @@ export default function Logbook() {
                           </Badge>
                         )}
                         {log.tags.map(tagId => {
-                          const tag = tags.find(t => t.id === tagId);
+                          const tag = tagById.get(tagId);
                           if (!tag) return null;
                           return (
                             <Badge key={tag.id} className={cn("text-white", tag.color)}>

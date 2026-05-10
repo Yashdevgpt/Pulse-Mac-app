@@ -385,25 +385,31 @@ textarea:-webkit-autofill:focus {
   max-height: none;
 }
 
-@media (min-width: 80rem) {
-  .brain-workspace-grid {
-    grid-template-columns: 260px minmax(0, 1fr) 380px;
+@media (min-width: 64rem) {
+  .rich-card-editor {
+    flex: 1 1 0;
+    height: auto;
+    min-height: 0;
   }
 
+  .brain-chat-card,
+  .pulse-nav-closed .brain-chat-card {
+    height: 100%;
+    max-height: 100%;
+  }
+}
+
+@media (min-width: 80rem) {
   .pulse-nav-closed .brain-workspace-grid {
     grid-template-columns: 260px minmax(360px, 1fr) minmax(500px, 0.9fr);
   }
 
-  .brain-chat-control-row {
-    grid-template-columns: minmax(0, 1fr) minmax(176px, 220px);
-  }
-
-  .brain-chat-card {
-    height: clamp(620px, calc(100dvh - 8rem), 940px);
-  }
-
   .pulse-nav-closed .brain-chat-card {
-    height: clamp(660px, calc(100dvh - 7rem), 980px);
+    grid-column: auto;
+  }
+
+  .pulse-nav-closed .brain-chat-control-row {
+    grid-template-columns: minmax(0, 1fr) minmax(176px, 220px);
   }
 }
 
@@ -412,16 +418,17 @@ textarea:-webkit-autofill:focus {
     grid-template-columns: 260px minmax(420px, 1fr) minmax(440px, 0.75fr);
   }
 
+  .brain-chat-card {
+    grid-column: auto;
+  }
+
   .pulse-nav-closed .brain-workspace-grid {
     grid-template-columns: 280px minmax(520px, 1fr) minmax(580px, 0.75fr);
   }
 
-  .pulse-nav-closed .brain-chat-card {
-    height: clamp(700px, calc(100dvh - 8rem), 1000px);
-  }
 }
 
-@media (max-height: 760px) {
+@media (max-height: 760px) and (max-width: 63.999rem) {
   .brain-chat-card,
   .pulse-nav-closed .brain-chat-card {
     height: clamp(500px, calc(100dvh - 12rem), 560px);

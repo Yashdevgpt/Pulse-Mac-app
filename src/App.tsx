@@ -16,8 +16,7 @@ export default function App() {
     const checkOngoingTasks = async () => {
       if ('Notification' in window && Notification.permission === 'granted') {
         try {
-          const logs = await db.getLogs();
-          const ongoing = logs.filter(l => l.status === 'Ongoing');
+          const ongoing = await db.getLogsByStatus('Ongoing');
           if (ongoing.length > 0) {
             new Notification('Pulse Watchtower', {
               body: `You have ${ongoing.length} ongoing monitoring tasks.`,

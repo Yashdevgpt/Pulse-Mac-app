@@ -50,6 +50,16 @@ const brainMemorySchemaState = {
   ready: null,
 };
 
+app.disable('x-powered-by');
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
 app.use(express.json({ limit: '2mb' }));
 
 // Trust proxy so req.ip resolves correctly behind reverse proxies (production).
@@ -166,7 +176,7 @@ const getBearerToken = (req) => {
 };
 
 const verifyFirebaseUser = async (req) => {
-  const token = getBearerToken(req) || String(req.body?.authToken || '');
+  const token = getBearerToken(req);
   if (!token) {
     const error = new Error('Sign in again before using Brain AI.');
     error.status = 401;

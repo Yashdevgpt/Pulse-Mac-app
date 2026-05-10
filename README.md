@@ -133,8 +133,8 @@ npm run dev                        # browser only at http://localhost:3000/
 │       ├── Logbook.tsx
 │       └── Watchtower.tsx
 └── supabase/
-    ├── brain_memory.sql           # Legacy schema entrypoint
-    └── migrations/                # Brain vector schema + source-type expansion
+    ├── brain_memory.sql           # Current schema entrypoint
+    └── migrations/                # Brain vector schema, source expansion, security hardening
 ```
 
 ### Key files
@@ -156,6 +156,9 @@ If the schema is missing in Supabase, apply:
 
 - `supabase/migrations/20260422094500_brain_memory.sql`
 - `supabase/migrations/20260424080000_expand_brain_memory_source_types.sql`
+- `supabase/migrations/20260511000000_harden_brain_memory_security.sql`
+
+`brain_chunks` intentionally keeps RLS enabled without client policies. That default-deny state prevents publishable/anon clients from reading vector memory while the local Pulse server uses the Supabase `service_role` key for indexing and retrieval. The hardening migration attempts to move `vector` into the `extensions` schema for hygiene, but safely leaves it in its current schema if Supabase rejects the move on an active project.
 
 In `work` mode the Brain UI falls back to grounded local note matching when remote AI is unavailable.
 
