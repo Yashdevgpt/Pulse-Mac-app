@@ -8,7 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Search, Activity, Clock, Edit2, Save, Star, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { createDspSlug } from '@/lib/slugs';
-import { deleteBrainMemorySource } from '@/lib/brainApi';
+import { autoIndexDspRecord, deleteBrainMemorySource } from '@/lib/brainApi';
 
 export default function Fleet() {
   const [dsps, setDsps] = useState<DSP[]>([]);
@@ -61,6 +61,7 @@ export default function Fleet() {
     setDsps(prev => prev.map(item => item.id === dsp.id ? updatedDsp : item));
     try {
       await db.saveDSP(updatedDsp);
+      autoIndexDspRecord(updatedDsp);
       toast.success(updatedDsp.starred ? `Pinned ${dsp.name} to the top` : `Unpinned ${dsp.name}`);
     } catch (error) {
       console.error('Could not update DSP star:', error);
@@ -102,6 +103,7 @@ export default function Fleet() {
     };
 
     await db.saveDSP(updatedDsp);
+    autoIndexDspRecord(updatedDsp);
     setDsps(prev => prev.map(item => item.id === dsp.id ? updatedDsp : item));
     setEditingDspId(null);
     setEditName('');

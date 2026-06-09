@@ -413,6 +413,7 @@ export default function Brain() {
 
   const rebuildMemory = async () => {
     setIsIndexing(true);
+    const progressToastId = 'brain-rebuild-progress';
     try {
       requireBrainMemoryGeminiKey();
       const currentUser = auth.currentUser;
@@ -435,11 +436,14 @@ export default function Brain() {
         chats: savedChats,
       });
 
-      const result = await indexBrainSources(sources);
+      const result = await indexBrainSources(sources, (processed, total) => {
+        toast.loading(`Indexing memory… ${processed}/${total} sources`, { id: progressToastId });
+      });
       toast.success(`Memory rebuilt with ${result.indexed} chunks across Pulse data`);
     } catch (error: any) {
       toast.error(error.message || 'Could not rebuild Brain memory.');
     } finally {
+      toast.dismiss(progressToastId);
       setIsIndexing(false);
     }
   };

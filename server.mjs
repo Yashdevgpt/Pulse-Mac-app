@@ -4,6 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import path from 'path';
 import crypto from 'crypto';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -60,7 +61,15 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '2mb' }));
+// Only /api/brain/index legitimately carries large bodies (a Rebuild Memory
+// batch of big Brain cards / logs). Every other route keeps the tight 2mb cap
+// so the big parser doesn't become a free memory amplifier for endpoints that
+// never need it.
+const jsonBodySmall = express.json({ limit: '2mb' });
+const jsonBodyLarge = express.json({ limit: '25mb' });
+app.use((req, res, next) =>
+  (req.path === '/api/brain/index' ? jsonBodyLarge : jsonBodySmall)(req, res, next)
+);
 
 // Trust proxy so req.ip resolves correctly behind reverse proxies (production).
 app.set('trust proxy', 1);
@@ -215,138 +224,12 @@ const cleanText = (value, max = 8000) =>
 const hashText = (value) =>
   crypto.createHash('sha256').update(value).digest('hex');
 
-const SEARCH_STOP_WORDS = new Set([
-  'a',
-  'about',
-  'all',
-  'also',
-  'an',
-  'and',
-  'any',
-  'are',
-  'can',
-  'detail',
-  'details',
-  'do',
-  'does',
-  'for',
-  'from',
-  'give',
-  'hey',
-  'have',
-  'how',
-  'i',
-  'in',
-  'into',
-  'is',
-  'it',
-  'added',
-  'latest',
-  'last',
-  'list',
-  'me',
-  'most',
-  'my',
-  'newest',
-  'of',
-  'on',
-  'only',
-  'please',
-  'recent',
-  'saved',
-  'show',
-  'tell',
-  'that',
-  'the',
-  'this',
-  'to',
-  'updated',
-  'what',
-  'whats',
-  'where',
-  'which',
-  'who',
-  'why',
-  'with',
-  'you',
-]);
-
-const sourceTypeQueryHints = {
-  user_profile: ['profile', 'account', 'email', 'name'],
-  dsp_record: ['dsp', 'dsps', 'partner', 'partners', 'integration', 'integrations'],
-  tag_record: ['tag', 'tags'],
-  brain_card: ['card', 'cards', 'brain', 'note', 'notes'],
-  fleet_log: ['log', 'logs', 'update', 'updates'],
-  saved_chat: ['chat', 'chats', 'conversation', 'conversations'],
-};
-
 const normalizeForSearch = (value) =>
   String(value || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-
-const getSearchTerms = (value) =>
-  Array.from(new Set(normalizeForSearch(value).split(' ')))
-    .filter((term) => term.length > 2 && !SEARCH_STOP_WORDS.has(term));
-
-const expandSearchTerms = (terms) =>
-  Array.from(new Set(terms.flatMap((term) => {
-    if (term === 'ortb') return ['ortb', 'openrtb', 'rtb'];
-    if (term === 'openrtb') return ['openrtb', 'ortb', 'rtb'];
-    return [term];
-  })));
-
-const sourceTextForSearch = (source) =>
-  normalizeForSearch([
-    source.source_type || source.sourceType,
-    source.title || source.cardTitle,
-    source.heading,
-    source.content || source.text,
-  ].filter(Boolean).join(' '));
-
-const sourceHasSearchTerm = (source, terms) => {
-  if (terms.length === 0) return false;
-  const haystack = ` ${sourceTextForSearch(source)} `;
-  return terms.some((term) => haystack.includes(` ${term} `));
-};
-
-const sourceMatchesType = (source, sourceTypes) =>
-  sourceTypes.includes(source.source_type || source.sourceType || 'brain_card');
-
-const getNonTypeQuestionTerms = (terms, sourceTypes) => {
-  const typeTerms = new Set(
-    sourceTypes.flatMap((sourceType) => sourceTypeQueryHints[sourceType] || [])
-  );
-  return terms.filter((term) => !typeTerms.has(term));
-};
-
-const isRelevantPrivateSource = (source, questionProfile) => {
-  const { hasExplicitSourceType, recentIntent, sourceTypes, terms } = questionProfile;
-  const nonTypeTerms = getNonTypeQuestionTerms(terms, sourceTypes);
-
-  if (sourceHasSearchTerm(source, nonTypeTerms.length > 0 ? nonTypeTerms : terms)) {
-    return true;
-  }
-
-  if (!sourceMatchesType(source, sourceTypes)) {
-    return false;
-  }
-
-  if (hasExplicitSourceType && nonTypeTerms.length === 0) {
-    return true;
-  }
-
-  if (recentIntent && nonTypeTerms.length === 0) {
-    return true;
-  }
-
-  return false;
-};
-
-const filterRelevantPrivateSources = (sources, questionProfile) =>
-  sources.filter((source) => isRelevantPrivateSource(source, questionProfile));
 
 const isInsufficientGroundingAnswer = (answer) =>
   normalizeForSearch(answer).startsWith('i do not have enough grounded information');
@@ -382,6 +265,63 @@ const getAiKeysFromReq = (req) => ({
   geminiKey: String(req.headers['x-gemini-key'] || '').trim(),
   openrouterKey: String(req.headers['x-openrouter-key'] || '').trim(),
 });
+
+// ─── AI keys persistence (local file) ─────────────────────────────────
+// localStorage proved unreliable for key storage in the Electron shell (its
+// origin changes with the random server port, abandoning the stored keys on
+// every launch). Keys now persist in a JSON file beside the runtime .env —
+// the same user-owned, never-leaves-this-Mac location that already holds the
+// Supabase service-role key. The client loads them at sign-in and keeps
+// sending them per-request via headers.
+// Anchored to the same directory the production .env loads from (see the
+// dotenv block at the top), so the two files never diverge — even when
+// PULSE_MODE=production is run manually without PULSE_ENV_PATH.
+const aiKeysFilePath = isProduction
+  ? path.join(path.dirname(process.env.PULSE_ENV_PATH || path.join(__dirname, '.env')), 'ai-keys.json')
+  : path.join(process.cwd(), '.ai-keys.local.json');
+
+const MAX_AI_KEY_LENGTH = 512;
+const AI_KEY_PATTERN = /^[\x21-\x7E]*$/; // printable ASCII, no whitespace/control chars
+
+// The key file is machine-global (not per-uid), so identity alone is not
+// enough: Firebase signup is open, meaning any local process could mint a
+// token and read/replace the owner's keys. Only the bootstrap admin — the
+// machine's owner — may touch the key store.
+const requireKeyStoreOwner = (user) => {
+  if (!isBootstrapAdminEmail(user.email)) {
+    const error = new Error('Only the Pulse owner account can manage AI keys.');
+    error.status = 403;
+    throw error;
+  }
+};
+
+const sanitizeAiKey = (value) => {
+  const key = String(value || '').trim();
+  if (key.length > MAX_AI_KEY_LENGTH || !AI_KEY_PATTERN.test(key)) {
+    const error = new Error('API key contains invalid characters or is too long.');
+    error.status = 400;
+    throw error;
+  }
+  return key;
+};
+
+const readStoredAiKeys = () => {
+  try {
+    const raw = fs.readFileSync(aiKeysFilePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    return {
+      geminiKey: typeof parsed.geminiKey === 'string' ? parsed.geminiKey.trim() : '',
+      openrouterKey: typeof parsed.openrouterKey === 'string' ? parsed.openrouterKey.trim() : '',
+    };
+  } catch {
+    return { geminiKey: '', openrouterKey: '' };
+  }
+};
+
+const writeStoredAiKeys = (keys) => {
+  const payload = JSON.stringify({ geminiKey: keys.geminiKey, openrouterKey: keys.openrouterKey }, null, 2);
+  fs.writeFileSync(aiKeysFilePath, `${payload}\n`, { encoding: 'utf8', mode: 0o600 });
+};
 
 const requireGeminiKey = (req) => {
   const { geminiKey } = getAiKeysFromReq(req);
@@ -431,14 +371,20 @@ const isGeminiFallbackError = (error) => {
   );
 };
 
-const OPENROUTER_MODEL = 'openai/gpt-5-nano';
+// Fallback chain, tried in order when Gemini is rate-limited or rejects the
+// key. One OpenRouter API key covers every model in the chain. Override via
+// OPENROUTER_MODELS in .env (comma-separated model ids).
+const OPENROUTER_MODELS = String(process.env.OPENROUTER_MODELS || 'deepseek/deepseek-chat,openai/gpt-oss-120b')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 
 // Calls OpenRouter's OpenAI-compatible chat completions endpoint with the
 // caller-supplied API key. Returns the assistant text. We deliberately keep
 // the SDK surface tiny (raw fetch) so there is no extra dep, and so the
 // fallback path is easy to reason about.
-const callOpenRouterChat = async (apiKey, prompt) => {
+const callOpenRouterChat = async (apiKey, prompt, openrouterModel) => {
   if (!apiKey) {
     const error = new Error('OpenRouter API key is not set; cannot fall back from Gemini.');
     error.status = 412;
@@ -454,7 +400,7 @@ const callOpenRouterChat = async (apiKey, prompt) => {
       'X-Title': 'Pulse',
     },
     body: JSON.stringify({
-      model: OPENROUTER_MODEL,
+      model: openrouterModel,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -501,12 +447,24 @@ const runChatWithFallback = async (req, res, prompt, geminiConfig = {}) => {
     }
   }
 
-  const text = await callOpenRouterChat(openrouterKey, prompt);
-  res.setHeader('X-Provider-Used', 'openrouter');
-  return {
-    provider: 'openrouter',
-    response: { text, candidates: [] },
-  };
+  let lastError = null;
+  for (const openrouterModel of OPENROUTER_MODELS) {
+    try {
+      const text = await callOpenRouterChat(openrouterKey, prompt, openrouterModel);
+      res.setHeader('X-Provider-Used', 'openrouter');
+      res.setHeader('X-Openrouter-Model', openrouterModel);
+      return {
+        provider: 'openrouter',
+        response: { text, candidates: [] },
+      };
+    } catch (error) {
+      lastError = error;
+      // 412 = no key configured; retrying other models cannot help.
+      if (error?.status === 412) throw error;
+      console.warn(`OpenRouter model ${openrouterModel} failed, trying next:`, error?.message || error);
+    }
+  }
+  throw lastError || new Error('All OpenRouter fallback models failed.');
 };
 
 const assertSupabase = () => {
@@ -833,12 +791,8 @@ const getQuestionSourceProfile = (question) => {
     hasExplicitSourceType,
     recentIntent: isRecentQuestion(question),
     sourceTypes: hasExplicitSourceType ? Array.from(sourceTypes) : allBrainSourceTypes,
-    terms: expandSearchTerms(getSearchTerms(question)),
   };
 };
-
-const getQuestionSourceTypes = (question) =>
-  getQuestionSourceProfile(question).sourceTypes;
 
 const getRecentMemorySources = async (uid, sourceTypes = allBrainSourceTypes, limit = 8) => {
   await ensureBrainMemorySchemaReady();
@@ -904,9 +858,12 @@ const getSourceTimestampLines = (source) => {
   return lines.length > 0 ? `\n${lines.join('\n')}` : '';
 };
 
+// Cap covers the worst-case assembly (8 recent-intent chunks + 10 vector
+// hits + 6 client passages) so no group is silently dropped now that the
+// lexical post-filter no longer prunes the list before this point.
 const formatSources = (sources) =>
   sources
-    .slice(0, 10)
+    .slice(0, 24)
     .map((source, index) => {
       const title = cleanText(source.title || source.cardTitle || 'Untitled', 160);
       const heading = cleanText(source.heading || title, 160);
@@ -978,6 +935,35 @@ ${sourceText || 'No private sources were found.'}
 Latest question:
 ${question}`;
 };
+
+app.get('/api/ai-keys', rateLimit, async (req, res) => {
+  try {
+    const user = await verifyFirebaseUser(req);
+    enforceUserRateLimit(user, res);
+    requireKeyStoreOwner(user);
+    res.json(readStoredAiKeys());
+  } catch (error) {
+    if (![401, 403].includes(error.status)) console.error('AI keys read error:', error);
+    jsonError(res, error.status || 500, error.message || 'Could not read AI keys.');
+  }
+});
+
+app.post('/api/ai-keys', rateLimit, async (req, res) => {
+  try {
+    const user = await verifyFirebaseUser(req);
+    enforceUserRateLimit(user, res);
+    requireKeyStoreOwner(user);
+    const keys = {
+      geminiKey: sanitizeAiKey(req.body?.geminiKey),
+      openrouterKey: sanitizeAiKey(req.body?.openrouterKey),
+    };
+    writeStoredAiKeys(keys);
+    res.json({ saved: true });
+  } catch (error) {
+    if (![400, 401, 403].includes(error.status)) console.error('AI keys write error:', error);
+    jsonError(res, error.status || 500, error.message || 'Could not save AI keys.');
+  }
+});
 
 app.post('/api/brain/index', rateLimit, async (req, res) => {
   try {
@@ -1126,7 +1112,12 @@ app.post('/api/brain/chat', rateLimit, async (req, res) => {
       }
     }
 
-    const privateSources = filterRelevantPrivateSources(dedupePrivateSources([
+    // Trust the vector search: chunks already passed the similarity floor in
+    // match_brain_chunks, and recentSources only load on explicit recent
+    // intent. The old lexical word-match post-filter dropped semantically
+    // relevant chunks whose text didn't literally contain a question word,
+    // which starved the model of grounding.
+    const privateSources = dedupePrivateSources([
       ...recentSources,
       ...memorySources,
       ...clientSources.map(source => ({
@@ -1136,7 +1127,7 @@ app.post('/api/brain/chat', rateLimit, async (req, res) => {
         content: source.content || source.text,
         similarity: source.score ? Math.min(Number(source.score) / 20, 1) : undefined,
       })),
-    ]), questionProfile).filter(source => cleanText(source.content || source.text || '').length > 0);
+    ]).filter(source => cleanText(source.content || source.text || '').length > 0);
 
     if (mode === 'work' && privateSources.length === 0) {
       return res.json({

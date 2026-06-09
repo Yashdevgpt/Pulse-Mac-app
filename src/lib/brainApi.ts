@@ -1,6 +1,6 @@
 import { auth } from '@/lib/firebase';
 import { toast } from 'sonner';
-import type { AppUser, BrainCard, BrainChat, DSP, Log, LogFile, Tag } from '@/lib/db';
+import { db, type AppUser, type BrainCard, type BrainChat, type DSP, type Log, type LogFile, type Tag } from '@/lib/db';
 import { extractKnowledgeFile } from '@/features/brain/file-extraction';
 import { consumeFallbackToastSlot, getAiKeys } from '@/lib/aiKeys';
 
@@ -81,8 +81,9 @@ const callBrainApi = async <T>(path: string, body: Record<string, unknown>) => {
   }
 
   if (response.headers.get('x-provider-used') === 'openrouter' && consumeFallbackToastSlot()) {
+    const fallbackModel = response.headers.get('x-openrouter-model') || 'an OpenRouter model';
     toast.message('Switched to OpenRouter', {
-      description: 'Gemini was rate-limited. Falling back to gpt-5-nano for now.',
+      description: `Gemini was rate-limited. Falling back to ${fallbackModel} for now.`,
     });
   }
 
@@ -312,9 +313,53 @@ export const buildCentralizedBrainSources = async ({
   ];
 };
 
-export const indexBrainSources = (sources: BrainMemorySource[]) => {
+// The server caps a single /api/brain/index request at 80 sources and the
+// JSON body at 25 MB. Rebuild Memory can easily exceed both once Fleet grows,
+// so requests are split into batches bounded by count AND serialized size.
+const MAX_SOURCES_PER_BATCH = 40;
+const MAX_BATCH_JSON_BYTES = 4_000_000;
+
+const batchSources = (sources: BrainMemorySource[]): BrainMemorySource[][] => {
+  const batches: BrainMemorySource[][] = [];
+  let current: BrainMemorySource[] = [];
+  let currentBytes = 0;
+
+  for (const source of sources) {
+    const bytes = JSON.stringify(source).length;
+    if (current.length > 0 && (current.length >= MAX_SOURCES_PER_BATCH || currentBytes + bytes > MAX_BATCH_JSON_BYTES)) {
+      batches.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+    current.push(source);
+    currentBytes += bytes;
+  }
+
+  if (current.length > 0) batches.push(current);
+  return batches;
+};
+
+export const indexBrainSources = async (
+  sources: BrainMemorySource[],
+  onProgress?: (processedSources: number, totalSources: number) => void,
+) => {
   requireBrainMemoryGeminiKey();
-  return callBrainApi<{ embedded: number; indexed: number; reused?: number }>('/api/brain/index', { sources });
+  const totals = { embedded: 0, indexed: 0, reused: 0 };
+  let processed = 0;
+
+  for (const batch of batchSources(sources)) {
+    const result = await callBrainApi<{ embedded: number; indexed: number; reused?: number }>(
+      '/api/brain/index',
+      { sources: batch }
+    );
+    totals.embedded += result.embedded || 0;
+    totals.indexed += result.indexed || 0;
+    totals.reused += result.reused || 0;
+    processed += batch.length;
+    onProgress?.(processed, sources.length);
+  }
+
+  return totals;
 };
 
 // Sugar for the common case of pushing a single source (one card / one chat)
@@ -350,3 +395,48 @@ export const summarizeBrainHistory = (messages: BrainApiMessage[]) =>
     '/api/brain/summarize-history',
     { messages }
   );
+
+// ─── Background auto-indexing for Fleet data ──────────────────────────
+// Brain cards and saved chats already index themselves on save. These
+// helpers extend the same fire-and-forget behavior to DSPs, logs, and tags
+// so the vector memory stays fresh without a manual "Rebuild Memory" click.
+// They are deliberately silent: skipped without a Gemini key (embeddings are
+// Gemini-only), and a failure only logs a warning — "Rebuild Memory" remains
+// the recovery path.
+
+const canAutoIndexMemory = () => getAiKeys().geminiKey.length > 0;
+
+const runAutoIndex = (label: string, build: () => Promise<BrainMemorySource[]>) => {
+  if (!canAutoIndexMemory()) return;
+  void (async () => {
+    const sources = await build();
+    if (sources.length === 0) return;
+    await indexBrainSources(sources);
+  })().catch((error: any) => {
+    console.warn(`Background ${label} memory update failed:`, error?.message || error);
+  });
+};
+
+export const autoIndexDspRecord = (dsp: DSP) =>
+  runAutoIndex('DSP', async () => {
+    const dspLogs = await db.getLogsByDSP(dsp.id);
+    return [dspToMemorySource(dsp, dspLogs)];
+  });
+
+// A log change also refreshes its parent DSP record, whose memory content
+// embeds the log count and latest-log summary.
+export const autoIndexFleetLog = (log: Log) =>
+  runAutoIndex('log', async () => {
+    const [dsps, tags, dspLogs] = await Promise.all([
+      db.getDSPs(),
+      db.getTags(),
+      db.getLogsByDSP(log.dspId),
+    ]);
+    const sources: BrainMemorySource[] = [await logToMemorySource(log, dsps, tags)];
+    const dsp = dsps.find((item) => item.id === log.dspId);
+    if (dsp) sources.push(dspToMemorySource(dsp, dspLogs));
+    return sources;
+  });
+
+export const autoIndexTagRecord = (tag: Tag) =>
+  runAutoIndex('tag', async () => [tagToMemorySource(tag)]);

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Activity, LogOut, KeyRound, Mail } from 'lucide-react';
 import { db } from '@/lib/db';
+import { syncAiKeysFromServer } from '@/lib/aiKeys';
 import { toast } from 'sonner';
 import ThemeToggle from '@/components/ThemeToggle';
 
@@ -29,6 +30,11 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
+        // Restore AI keys from the on-disk store (survives app restarts,
+        // unlike localStorage whose origin changes with the server port).
+        void syncAiKeysFromServer().catch((error) => {
+          console.warn('Could not restore AI keys from local store:', error);
+        });
         try {
           const access = await db.getUserAccess(currentUser);
           setAccessStatus(access.status);

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Check, X, ShieldAlert, Shield, ShieldOff, Edit2, Save, Trash2, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { auth } from '@/lib/firebase';
-import { getAiKeys, setAiKeys, clearAiKeys } from '@/lib/aiKeys';
+import { getAiKeys, saveAiKeysEverywhere, clearAiKeysEverywhere } from '@/lib/aiKeys';
 
 export default function Admin() {
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -24,20 +24,38 @@ export default function Admin() {
     const stored = getAiKeys();
     setGeminiKeyInput(stored.geminiKey);
     setOpenrouterKeyInput(stored.openrouterKey);
+
+    // The on-disk key sync at sign-in is async and may finish after this
+    // panel mounts; refresh the inputs when the local key cache changes.
+    const refreshFromStore = () => {
+      const latest = getAiKeys();
+      setGeminiKeyInput(latest.geminiKey);
+      setOpenrouterKeyInput(latest.openrouterKey);
+    };
+    window.addEventListener('pulse:ai-keys:changed', refreshFromStore);
+    return () => window.removeEventListener('pulse:ai-keys:changed', refreshFromStore);
   }, []);
 
-  const handleSaveKeys = () => {
-    setAiKeys({ geminiKey: geminiKeyInput, openrouterKey: openrouterKeyInput });
-    setKeysSavedAt(Date.now());
-    toast.success('AI keys saved on this device');
+  const handleSaveKeys = async () => {
+    try {
+      await saveAiKeysEverywhere({ geminiKey: geminiKeyInput, openrouterKey: openrouterKeyInput });
+      setKeysSavedAt(Date.now());
+      toast.success('AI keys saved on this Mac — they now survive app restarts');
+    } catch (error: any) {
+      toast.error(error?.message || 'Could not save AI keys.');
+    }
   };
 
-  const handleClearKeys = () => {
-    clearAiKeys();
-    setGeminiKeyInput('');
-    setOpenrouterKeyInput('');
-    setKeysSavedAt(null);
-    toast.message('AI keys cleared');
+  const handleClearKeys = async () => {
+    try {
+      await clearAiKeysEverywhere();
+      setGeminiKeyInput('');
+      setOpenrouterKeyInput('');
+      setKeysSavedAt(null);
+      toast.message('AI keys cleared from this Mac');
+    } catch (error: any) {
+      toast.error(error?.message || 'Could not clear AI keys.');
+    }
   };
 
   const maskedHint = (value: string) =>
@@ -139,7 +157,7 @@ export default function Admin() {
           <div>
             <h2 className="text-2xl font-black uppercase text-black">AI Keys</h2>
             <p className="text-sm text-zinc-600 font-medium">
-              Stored only on this device (localStorage). Brain calls Gemini first; on rate limit or auth error it falls back to OpenRouter (gpt-5-nano).
+              Stored only on this Mac (a private file in Pulse's app data — survives restarts). Brain calls Gemini first; on rate limit or auth error it falls back to OpenRouter (DeepSeek Chat, then GPT-OSS-120B). One OpenRouter key covers both fallback models.
             </p>
           </div>
         </div>
@@ -189,7 +207,7 @@ export default function Admin() {
               {showOpenrouter ? <EyeOff className="w-4 h-4 stroke-[3]" /> : <Eye className="w-4 h-4 stroke-[3]" />}
             </Button>
           </div>
-          <p className="text-xs text-zinc-500 font-medium">{maskedHint(getAiKeys().openrouterKey)} · Get one at openrouter.ai/keys · Model locked to openai/gpt-5-nano</p>
+          <p className="text-xs text-zinc-500 font-medium">{maskedHint(getAiKeys().openrouterKey)} · Get one at openrouter.ai/keys · Fallback chain: deepseek/deepseek-chat → openai/gpt-oss-120b</p>
         </div>
 
         <div className="flex flex-wrap gap-3 pt-2">

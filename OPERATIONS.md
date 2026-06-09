@@ -58,7 +58,7 @@ Click Pulse in Dock or Launchpad.
 
 > **Your `.env` and AI keys are NOT lost.** They live outside the `.app`:
 > - `.env` is at `~/Library/Application Support/Pulse/.env`
-> - AI keys are in Electron's localStorage (`~/Library/Application Support/Pulse/Local Storage/`)
+> - AI keys are at `~/Library/Application Support/Pulse/ai-keys.json` (written by Admin → AI Keys)
 >
 > The new build inherits both automatically. No reconfig needed.
 
@@ -110,10 +110,11 @@ Open **Admin → AI Keys** and verify the hint under each input shows `Saved (N 
 
 ### Symptom D — "Switched to OpenRouter" toast every day
 
-That's normal. Means Gemini hit the daily 20-RPD free-tier cap and Pulse silently fell over to `openai/gpt-5-nano`. Solutions:
+That's normal. Means Gemini hit the daily 20-RPD free-tier cap and Pulse silently fell over to the OpenRouter chain (`deepseek/deepseek-chat`, then `openai/gpt-oss-120b` — the toast names the model used). Solutions:
 
 - Upgrade to a paid Gemini tier
-- Or: add credit to OpenRouter and let the fallback handle daily traffic
+- Or: add credit to OpenRouter and let the fallback handle daily traffic (both fallback models are dirt-cheap)
+- Change the chain via `OPENROUTER_MODELS=model-a,model-b` in `~/Library/Application Support/Pulse/.env`
 
 ### Symptom E — Stuck Pulse process / app frozen
 

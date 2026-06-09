@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createDspSlug } from '@/lib/slugs';
+import { autoIndexDspRecord, autoIndexFleetLog } from '@/lib/brainApi';
 import {
   Popover,
   PopoverContent,
@@ -202,6 +203,7 @@ export default function Bridge() {
       updatedAt: Date.now(),
     };
     await db.saveDSP(newDsp);
+    autoIndexDspRecord(newDsp);
     setDsps([newDsp, ...dsps]);
     setSelectedDspId(newDsp.id);
     setNewDspName('');
@@ -238,6 +240,7 @@ export default function Bridge() {
     };
 
     await db.saveLog(newLog);
+    autoIndexFleetLog(newLog);
     toast.success('Update logged successfully.');
     
     // Reset form

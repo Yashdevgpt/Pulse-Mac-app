@@ -1,6 +1,6 @@
 # Pulse (macOS App)
 
-Pulse is a personal, invite-only desktop app for macOS. It bundles a React + Vite frontend, an Express server, Firebase Auth + Firestore for app data, and Supabase pgvector for Brain memory into a single Electron `.app`. AI provider keys (Google Gemini, OpenRouter) are entered inside the app and stored only in your Mac's `localStorage` — they are never persisted to a backend.
+Pulse is a personal, invite-only desktop app for macOS. It bundles a React + Vite frontend, an Express server, Firebase Auth + Firestore for app data, and Supabase pgvector for Brain memory into a single Electron `.app`. AI provider keys (Google Gemini, OpenRouter) are entered inside the app and stored only in a private file on your Mac (`~/Library/Application Support/Pulse/ai-keys.json`) — they survive app restarts and are never persisted to a backend.
 
 This repository ships the Mac variant. The web-only backup lives at [Pulse-Main](https://github.com/Yashdevgpt/Pulse-Main).
 
@@ -11,7 +11,7 @@ This repository ships the Mac variant. The web-only backup lives at [Pulse-Main]
 - Firebase Authentication + Firestore
 - Supabase Postgres + pgvector for Brain vector memory
 - Google Gemini (`gemini-2.5-flash` chat, `gemini-embedding-001` 768-dim embeddings)
-- OpenRouter (`openai/gpt-5-nano`) — automatic fallback when Gemini hits rate limits / auth errors
+- OpenRouter (`deepseek/deepseek-chat`, then `openai/gpt-oss-120b`) — automatic fallback chain when Gemini hits rate limits / auth errors
 - Electron + electron-builder (arm64 unsigned `.dmg`)
 
 ## Quick Start (build the Mac app)
@@ -63,18 +63,20 @@ GEMINI_EMBEDDING_MODEL=gemini-embedding-001
 GEMINI_EMBEDDING_DIM=768
 ```
 
-> **AI keys (Gemini, OpenRouter) do NOT go in `.env`.** They are entered inside the app under **Admin → AI Keys** and persisted only in browser `localStorage` (`pulse:ai-keys:v1`).
+> **AI keys (Gemini, OpenRouter) do NOT go in `.env`.** They are entered inside the app under **Admin → AI Keys**. The local server persists them in `ai-keys.json` next to the runtime `.env` (production: `~/Library/Application Support/Pulse/ai-keys.json`; dev: `.ai-keys.local.json`, gitignored), so they survive app restarts. `localStorage` (`pulse:ai-keys:v1`) remains the in-session cache the client reads synchronously.
+>
+> Optional `.env` override: `OPENROUTER_MODELS` — comma-separated OpenRouter model ids tried in order on fallback (default `deepseek/deepseek-chat,openai/gpt-oss-120b`).
 
 ### Get the keys
 
 - **Gemini:** https://aistudio.google.com/apikey
-- **OpenRouter:** https://openrouter.ai/keys (locked to `openai/gpt-5-nano` in the fallback path)
+- **OpenRouter:** https://openrouter.ai/keys (one key covers every model in the fallback chain)
 - **Supabase:** Project Settings → API → copy Project URL, `anon public` key, and `service_role` key
 - **Firebase:** Project Settings → General → SDK setup → copy the web config object
 
 ## OpenRouter Fallback
 
-`runChatWithFallback` in `server.mjs` calls Gemini first. On HTTP 401 / 403 / 429 or messages containing `rate limit`, `quota`, `RESOURCE_EXHAUSTED`, `exceeded`, `api key not valid`, or `invalid api key`, it transparently retries against OpenRouter's OpenAI-compatible endpoint with `model: openai/gpt-5-nano`. The provider used surfaces in the `X-Provider-Used` response header and the client toasts "Switched to OpenRouter" once per UTC day.
+`runChatWithFallback` in `server.mjs` calls Gemini first. On HTTP 401 / 403 / 429 or messages containing `rate limit`, `quota`, `RESOURCE_EXHAUSTED`, `exceeded`, `api key not valid`, or `invalid api key`, it transparently retries against OpenRouter's OpenAI-compatible endpoint, walking the model chain in order (`deepseek/deepseek-chat`, then `openai/gpt-oss-120b`; override via `OPENROUTER_MODELS`). The provider and model used surface in the `X-Provider-Used` / `X-Openrouter-Model` response headers and the client toasts "Switched to OpenRouter" once per UTC day.
 
 Embeddings stay Gemini-only because `brain_chunks.embedding` is fixed at 768 dimensions in Supabase.
 
@@ -121,7 +123,7 @@ npm run dev                        # browser only at http://localhost:3000/
 │   ├── features/
 │   │   └── brain/                 # Brain UI constants and pure helpers
 │   ├── lib/
-│   │   ├── aiKeys.ts              # localStorage AI key store + fallback toast slot
+│   │   ├── aiKeys.ts              # AI key store (on-disk via /api/ai-keys + localStorage cache)
 │   │   ├── brainApi.ts            # Brain API client (injects x-gemini-key + x-openrouter-key)
 │   │   ├── db.ts                  # Firestore access layer
 │   │   └── firebase.ts
@@ -140,8 +142,8 @@ npm run dev                        # browser only at http://localhost:3000/
 ### Key files
 
 - `electron/main.cjs` — spawns `server.mjs` as a Node child via `ELECTRON_RUN_AS_NODE=1`, finds a free `127.0.0.1` port, opens `BrowserWindow`, seeds `userData/.env` from template on first run.
-- `server.mjs` — Brain endpoints (`/api/brain/index`, `/api/brain/delete-source`, `/api/brain/chat`, `/api/brain/summarize-history`, `/api/brain/reset-memory`). Reads AI keys from `x-gemini-key` / `x-openrouter-key` headers per request — never from env. Two run modes: dev (Vite middleware) and `PULSE_MODE=production` (static `dist/`).
-- `src/lib/aiKeys.ts` — `getAiKeys()` / `setAiKeys()` / `clearAiKeys()` plus `consumeFallbackToastSlot()` for once-per-day fallback toast throttling.
+- `server.mjs` — Brain endpoints (`/api/brain/index`, `/api/brain/delete-source`, `/api/brain/chat`, `/api/brain/summarize-history`, `/api/brain/reset-memory`) plus AI-key persistence (`GET`/`POST /api/ai-keys`, backed by `ai-keys.json` beside the runtime `.env`). Brain calls read AI keys from `x-gemini-key` / `x-openrouter-key` headers per request — never from env. Two run modes: dev (Vite middleware) and `PULSE_MODE=production` (static `dist/`).
+- `src/lib/aiKeys.ts` — `saveAiKeysEverywhere()` / `clearAiKeysEverywhere()` (disk-first via `/api/ai-keys`, then `localStorage` cache), `syncAiKeysFromServer()` (restores keys at sign-in), `getAiKeys()` for synchronous reads, plus `consumeFallbackToastSlot()` for once-per-day fallback toast throttling.
 - `src/lib/brainApi.ts` — every Brain API call attaches the AI key headers and surfaces the OpenRouter fallback toast on `X-Provider-Used: openrouter`.
 - `src/pages/Admin.tsx` — masked Gemini + OpenRouter inputs with show/hide toggles, Save / Clear, and a "Saved (N chars, ends XXXX)" hint.
 

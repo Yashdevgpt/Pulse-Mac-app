@@ -6,7 +6,7 @@ import { Activity, Check, CheckCircle2, ChevronDown, Clock, Plus, SlidersHorizon
 import { toast } from 'sonner';
 
 import { db, Log, Tag } from '@/lib/db';
-import { deleteBrainMemorySource } from '@/lib/brainApi';
+import { autoIndexFleetLog, autoIndexTagRecord, deleteBrainMemorySource } from '@/lib/brainApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -202,6 +202,7 @@ export default function Watchtower() {
     setIsCreatingTag(true);
     try {
       await db.saveTag(tag);
+      autoIndexTagRecord(tag);
       const nextTags = [...tags, tag];
       setTags(nextTags);
       // Make the new tag visible in Watchtower right away.
@@ -255,6 +256,7 @@ export default function Watchtower() {
     if (resolutionFile) log.resolutionFile = resolutionFile;
 
     await db.saveLog(log);
+    autoIndexFleetLog(log);
     toast.success('Task marked as completed');
     setResolvingId(null);
     setResolutionNote('');

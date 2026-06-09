@@ -24,7 +24,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { findDspBySlugOrId } from '@/lib/slugs';
-import { deleteBrainMemorySource } from '@/lib/brainApi';
+import { autoIndexDspRecord, autoIndexFleetLog, deleteBrainMemorySource } from '@/lib/brainApi';
 
 type ExportImageType = 'jpg' | 'png' | 'gif' | 'bmp';
 
@@ -95,6 +95,9 @@ export default function Logbook() {
       console.warn('Brain memory cleanup for fleet_log failed:', (error as Error)?.message || error);
     }
     await db.deleteLog(logId);
+    // The DSP record's memory entry embeds log counts and the latest log
+    // summary, so refresh it now that a log is gone.
+    if (dsp) autoIndexDspRecord(dsp);
     setLogs(prev => prev.filter(l => l.id !== logId));
     toast.success('Log deleted');
   };
@@ -118,7 +121,8 @@ export default function Logbook() {
       updatedAt: Date.now() 
     };
     await db.saveLog(updatedLog);
-    
+    autoIndexFleetLog(updatedLog);
+
     setLogs(logs.map(l => l.id === updatedLog.id ? updatedLog : l));
     setIsEditDialogOpen(false);
     setEditingLog(null);
@@ -150,6 +154,7 @@ export default function Logbook() {
           updatedAt: Date.now()
         };
         await db.saveLog(updatedLog);
+        autoIndexFleetLog(updatedLog);
         setLogs(prev => prev.map(l => l.id === updatedLog.id ? updatedLog : l));
         toast.success('File attached');
       }
