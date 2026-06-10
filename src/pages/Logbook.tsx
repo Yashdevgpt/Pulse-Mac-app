@@ -7,7 +7,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel } from 'docx';
-import { ArrowLeft, Search, Paperclip, MoreVertical, Trash2, Edit2, Calendar as CalendarIcon, Download } from 'lucide-react';
+import { ArrowLeft, BookOpen, Search, Paperclip, MoreVertical, Trash2, Edit2, Calendar as CalendarIcon, Download } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
+import EmptyState from '@/components/EmptyState';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -351,26 +353,38 @@ export default function Logbook() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <Button variant="ghost" className="-ml-4 mb-4 text-zinc-500" onClick={() => navigate('/fleet')}>
-          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Fleet
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <Button
+          className="glass-btn px-3"
+          onClick={() => navigate('/fleet')}
+          title="Back to Fleet"
+          aria-label="Back to Fleet"
+        >
+          <ArrowLeft className="w-4 h-4 stroke-[1.75]" />
+          <span className="hidden sm:inline">Fleet</span>
         </Button>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-light text-zinc-900 tracking-tight">{dsp.name}</h1>
-            <p className="text-zinc-500 mt-1">Activity Logbook</p>
-          </div>
-          <Button variant="outline" onClick={() => setIsExportDialogOpen(true)}>
-            <Download className="w-4 h-4 mr-2" /> Export Logs
-          </Button>
-        </div>
+        <PageHeader
+          icon={BookOpen}
+          title={dsp.name}
+          subtitle="Activity Logbook"
+          compact
+          className="mb-0 min-w-0 flex-1"
+          actions={
+            <Button
+              className="glass-btn glass-btn-gold"
+              onClick={() => setIsExportDialogOpen(true)}
+            >
+              <Download className="w-4 h-4 mr-2 stroke-[1.75]" /> Export Logs
+            </Button>
+          }
+        />
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 mb-8 bg-white p-4 rounded-xl border border-zinc-200">
+      <div className="glass-panel mb-8 flex flex-col gap-4 p-4 sm:flex-row">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-          <Input 
-            placeholder="Search activity..." 
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 stroke-[1.75] text-[var(--lux-soft)]" />
+          <Input
+            placeholder="Search activity..."
             className="pl-9"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -380,9 +394,14 @@ export default function Logbook() {
           {['All', 'Ongoing', 'Completed'].map(s => (
             <Button
               key={s}
-              variant={statusFilter === s ? 'default' : 'outline'}
               onClick={() => setStatusFilter(s)}
               size="sm"
+              className={cn(
+                'glass-btn',
+                statusFilter === s && s === 'Ongoing' ? 'bg-[var(--lux-amber-fill)] border-[var(--lux-amber-border)] text-[var(--lux-amber)]' :
+                statusFilter === s && s === 'Completed' ? 'bg-[var(--lux-emerald-fill)] border-[var(--lux-emerald-border)] text-[var(--lux-emerald)]' :
+                statusFilter === s ? 'bg-[var(--lux-fill-strong)] border-[var(--lux-border-strong)]' : ''
+              )}
             >
               {s}
             </Button>
@@ -392,40 +411,45 @@ export default function Logbook() {
 
       <div className="space-y-12">
         {groupedLogs.length === 0 ? (
-          <div className="text-center py-20 text-zinc-500">No activity found.</div>
+          <EmptyState
+            icon={Search}
+            title="No activity found"
+            description="Log an update from the Bridge, or loosen the search and status filters."
+          />
         ) : (
           groupedLogs.map((group, i) => (
             <div key={i} className="relative">
-              <div className="sticky top-0 z-10 bg-zinc-50/90 backdrop-blur-sm py-2 mb-6">
-                <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider flex items-center">
-                  <CalendarIcon className="w-4 h-4 mr-2" />
+              <div className="sticky top-0 z-10 mb-6 bg-[var(--lux-bg)]/80 py-2 backdrop-blur-md">
+                <h3 className="glass-chip px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--lux-muted)]">
+                  <CalendarIcon className="w-3.5 h-3.5 stroke-[1.75] text-[var(--lux-gold)]" />
                   Week of {format(group.weekStart, 'MMM do, yyyy')}
                 </h3>
               </div>
-              
-              <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-zinc-200 before:to-transparent">
+
+              <div className="relative space-y-6 pl-10 before:absolute before:inset-y-2 before:left-[7px] before:w-px before:bg-[var(--lux-border-strong)]">
                 {group.logs.map((log) => (
-                  <div key={log.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-zinc-50 bg-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                      <div className={cn(
-                        "w-2.5 h-2.5 rounded-full",
-                        log.status === 'Ongoing' ? 'bg-orange-500' : 
-                        log.status === 'Completed' ? 'bg-green-500' : 'bg-blue-500'
-                      )} />
-                    </div>
-                    
-                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-5 rounded-xl shadow-sm border border-zinc-200 hover:border-blue-200 transition-colors">
+                  <div key={log.id} className="relative">
+                    <div
+                      className={cn(
+                        'absolute -left-10 top-5 h-[15px] w-[15px] rounded-full',
+                        log.status === 'Ongoing' ? 'bg-[var(--lux-amber)] ring-4 ring-[var(--lux-amber-fill)]' :
+                        log.status === 'Completed' ? 'bg-[var(--lux-emerald)] ring-4 ring-[var(--lux-emerald-fill)]' : 'bg-[var(--lux-sapphire)] ring-4 ring-[var(--lux-sapphire-fill)]'
+                      )}
+                      aria-hidden
+                    />
+
+                    <div className="glass-panel p-5 transition-all hover:-translate-y-0.5 hover:border-[var(--lux-border-strong)]">
                       <div className="flex justify-between items-start mb-2">
-                        <div className="text-xs text-zinc-500 font-medium">
+                        <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--lux-soft)]">
                           {format(log.createdAt, 'MMM do, h:mm a')}
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger
                             render={
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" />
+                              <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full border border-[var(--lux-border)] p-0 text-[var(--lux-muted)] hover:bg-[var(--lux-fill)] hover:text-[var(--lux-text)]" />
                             }
                           >
-                            <MoreVertical className="h-4 w-4" />
+                            <MoreVertical className="h-4 w-4 stroke-[1.75]" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => handleEditClick(log)}>
@@ -440,24 +464,24 @@ export default function Logbook() {
                             }}>
                               <Paperclip className="w-4 h-4 mr-2" /> Attach File
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(log.id)}>
+                            <DropdownMenuItem className="text-[var(--lux-ruby)]" onClick={() => handleDelete(log.id)}>
                               <Trash2 className="w-4 h-4 mr-2" /> Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                       
-                      <p className="text-zinc-800 whitespace-pre-wrap text-sm mb-4 leading-relaxed">
+                      <p className="whitespace-pre-wrap text-sm mb-4 leading-relaxed text-[var(--lux-text)]">
                         {log.content}
                       </p>
-                      
+
                       {log.file && (
-                        <div className="mb-4 p-2 bg-zinc-50 rounded border border-zinc-200 flex items-center justify-between">
-                          <div className="flex items-center text-sm text-zinc-600 truncate">
-                            <Paperclip className="w-4 h-4 mr-2 shrink-0" />
+                        <div className="mb-4 flex items-center justify-between rounded-xl border border-[var(--lux-border)] bg-[var(--lux-fill)] p-2.5">
+                          <div className="flex items-center text-sm font-medium text-[var(--lux-text)] truncate">
+                            <Paperclip className="w-4 h-4 mr-2 shrink-0 stroke-[1.75] text-[var(--lux-soft)]" />
                             <span className="truncate">{log.file.name}</span>
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => {
+                          <Button variant="ghost" size="sm" className="font-medium text-[var(--lux-gold)] underline decoration-1 underline-offset-4" onClick={() => {
                             const a = document.createElement('a');
                             a.href = log.file!.data;
                             a.download = log.file!.name;
@@ -469,17 +493,17 @@ export default function Logbook() {
                       )}
 
                       {log.resolutionNote && (
-                        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                          <h4 className="text-xs font-bold text-green-800 uppercase mb-2">Resolution Notes</h4>
-                          <p className="text-sm text-green-900 whitespace-pre-wrap">{log.resolutionNote}</p>
-                          
+                        <div className="mb-4 rounded-xl border border-[var(--lux-emerald-border)] bg-[var(--lux-emerald-fill)] p-4">
+                          <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--lux-emerald)]">Resolution Notes</h4>
+                          <p className="text-sm text-[var(--lux-text)] whitespace-pre-wrap">{log.resolutionNote}</p>
+
                           {log.resolutionFile && (
-                            <div className="mt-3 p-2 bg-white rounded border border-green-200 flex items-center justify-between">
-                              <div className="flex items-center text-sm text-green-700 truncate">
-                                <Paperclip className="w-4 h-4 mr-2 shrink-0" />
+                            <div className="mt-3 flex items-center justify-between rounded-xl border border-[var(--lux-border)] bg-[var(--lux-fill)] p-2.5">
+                              <div className="flex items-center text-sm font-medium text-[var(--lux-text)] truncate">
+                                <Paperclip className="w-4 h-4 mr-2 shrink-0 stroke-[1.75] text-[var(--lux-soft)]" />
                                 <span className="truncate">{log.resolutionFile.name}</span>
                               </div>
-                              <Button variant="ghost" size="sm" className="text-green-700 hover:text-green-800 hover:bg-green-100" onClick={() => {
+                              <Button variant="ghost" size="sm" className="font-medium text-[var(--lux-gold)] underline decoration-1 underline-offset-4" onClick={() => {
                                 const a = document.createElement('a');
                                 a.href = log.resolutionFile!.data;
                                 a.download = log.resolutionFile!.name;
@@ -494,8 +518,11 @@ export default function Logbook() {
 
                       <div className="flex flex-wrap gap-2 mt-auto">
                         {log.status !== 'None' && (
-                          <Badge variant="outline" className={cn(
-                            log.status === 'Ongoing' ? 'text-orange-700 bg-orange-50 border-orange-200' : 'text-green-700 bg-green-50 border-green-200'
+                          <Badge className={cn(
+                            'text-[11px] font-semibold uppercase tracking-[0.14em]',
+                            log.status === 'Ongoing'
+                              ? 'border-[var(--lux-amber-border)] bg-[var(--lux-amber-fill)] text-[var(--lux-amber)]'
+                              : 'border-[var(--lux-emerald-border)] bg-[var(--lux-emerald-fill)] text-[var(--lux-emerald)]'
                           )}>
                             {log.status}
                           </Badge>
@@ -504,7 +531,8 @@ export default function Logbook() {
                           const tag = tagById.get(tagId);
                           if (!tag) return null;
                           return (
-                            <Badge key={tag.id} className={cn("text-white", tag.color)}>
+                            <Badge key={tag.id}>
+                              <span className={cn('h-2 w-2 rounded-full', tag.color)} aria-hidden />
                               {tag.name}
                             </Badge>
                           );
@@ -520,29 +548,30 @@ export default function Logbook() {
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Edit Log</DialogTitle>
+        <DialogContent className="sm:max-w-[500px] gap-0 p-0">
+          <DialogHeader className="border-b border-[var(--lux-border)] p-5">
+            <DialogTitle className="text-2xl">Edit Log</DialogTitle>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <Textarea 
+          <div className="p-5 space-y-4">
+            <Textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
               className="min-h-[150px]"
             />
-            
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">Task Status</label>
+              <label className="lux-label">Task Status</label>
               <div className="flex gap-2">
                 {(['None', 'Ongoing', 'Completed'] as const).map((s) => (
                   <Button
                     key={s}
-                    variant={editStatus === s ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setEditStatus(s)}
                     className={cn(
-                      editStatus === s && s === 'Ongoing' && 'bg-orange-500 hover:bg-orange-600',
-                      editStatus === s && s === 'Completed' && 'bg-green-600 hover:bg-green-700',
+                      'glass-btn',
+                      editStatus === s && s === 'Ongoing' ? 'bg-[var(--lux-amber-fill)] border-[var(--lux-amber-border)] text-[var(--lux-amber)]' :
+                      editStatus === s && s === 'Completed' ? 'bg-[var(--lux-emerald-fill)] border-[var(--lux-emerald-border)] text-[var(--lux-emerald)]' :
+                      editStatus === s ? 'bg-[var(--lux-fill-strong)] border-[var(--lux-border-strong)]' : ''
                     )}
                   >
                     {s}
@@ -552,27 +581,26 @@ export default function Logbook() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Tags</label>
+              <label className="lux-label">Tags</label>
               <div className="flex flex-wrap gap-2">
                 {tags.map((tag) => {
                   const isSelected = editTags.includes(tag.id);
                   return (
                     <Badge
                       key={tag.id}
-                      variant={isSelected ? 'default' : 'outline'}
                       className={cn(
-                        "cursor-pointer transition-colors",
-                        isSelected ? tag.color : "hover:bg-zinc-100",
-                        isSelected && "text-white"
+                        'cursor-pointer px-3 py-1 transition-all hover:-translate-y-[1px]',
+                        isSelected && 'border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)]'
                       )}
                       onClick={() => {
-                        setEditTags(prev => 
-                          prev.includes(tag.id) 
+                        setEditTags(prev =>
+                          prev.includes(tag.id)
                             ? prev.filter(id => id !== tag.id)
                             : [...prev, tag.id]
                         );
                       }}
                     >
+                      <span className={cn('h-2 w-2 rounded-full', tag.color)} aria-hidden />
                       {tag.name}
                     </Badge>
                   );
@@ -580,34 +608,34 @@ export default function Logbook() {
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveEdit}>Save Changes</Button>
+          <DialogFooter className="m-0 border-t border-[var(--lux-border)] bg-[var(--lux-fill)] p-4">
+            <Button className="glass-btn" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button className="glass-btn glass-btn-gold" onClick={handleSaveEdit}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Export Logs</DialogTitle>
+        <DialogContent className="gap-0 p-0">
+          <DialogHeader className="border-b border-[var(--lux-border)] p-5">
+            <DialogTitle className="text-2xl">Export Logs</DialogTitle>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <p className="text-sm text-zinc-500">Select a date range to export. Leave blank to export all logs.</p>
+          <div className="p-5 space-y-4">
+            <p className="text-sm text-[var(--lux-muted)]">Select a date range to export. Leave blank to export all logs.</p>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Start Date</label>
+                <label className="lux-label">Start Date</label>
                 <Input type="date" value={exportStartDate} onChange={e => setExportStartDate(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">End Date</label>
+                <label className="lux-label">End Date</label>
                 <Input type="date" value={exportEndDate} onChange={e => setExportEndDate(e.target.value)} />
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsExportDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleExport}>Export Word</Button>
+          <DialogFooter className="m-0 border-t border-[var(--lux-border)] bg-[var(--lux-fill)] p-4">
+            <Button className="glass-btn" onClick={() => setIsExportDialogOpen(false)}>Cancel</Button>
+            <Button className="glass-btn glass-btn-gold" onClick={handleExport}>Export Word</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

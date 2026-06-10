@@ -117,10 +117,10 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--color-neo-bg)]">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center">
-          <Activity className="w-12 h-12 text-black mb-4 stroke-[3]" />
-          <p className="text-black font-bold uppercase tracking-widest">Loading Pulse...</p>
+          <Activity className="w-12 h-12 text-[var(--lux-gold)] mb-4 stroke-[1.75]" />
+          <p className="lux-label">Loading Pulse...</p>
         </div>
       </div>
     );
@@ -128,23 +128,23 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[var(--color-neo-bg)] p-4 sm:p-6">
+      <div className="min-h-screen p-4 sm:p-6">
         <div className="mx-auto flex min-h-screen w-full max-w-md items-center justify-center">
           <div className="w-full space-y-4">
             <div className="flex justify-end">
               <ThemeToggle className="w-auto px-3" />
             </div>
 
-            <div className="neo-box w-full bg-[var(--color-neo-surface)] p-6 text-center sm:p-8">
+            <div className="glass-panel w-full p-6 text-center sm:p-8">
               <div className="flex justify-center">
-                <div className="flex h-20 w-20 items-center justify-center rounded-2xl border-4 border-black bg-[var(--color-neo-yellow)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                  <Activity className="h-10 w-10 text-black stroke-[3]" />
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)] shadow-[0_14px_38px_-14px_var(--lux-gold-glow)]">
+                  <Activity className="h-9 w-9 stroke-[1.5] text-[var(--lux-gold)]" />
                 </div>
               </div>
-              
+
               <div className="mt-6 space-y-2">
-                <h1 className="text-4xl font-black uppercase tracking-tight text-black">Pulse</h1>
-                <p className="font-medium text-zinc-600">
+                <h1 className="font-display text-5xl font-semibold tracking-tight text-[var(--lux-text)]">Pulse</h1>
+                <p className="text-[var(--lux-muted)]">
                   {isResetting ? 'Reset your password' : 'Authorized personnel only.'}
                 </p>
               </div>
@@ -152,30 +152,30 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
               {isResetting ? (
                 <form onSubmit={handleResetPassword} className="mt-8 space-y-4 text-left">
                   <div className="space-y-2">
-                    <label className="text-sm font-bold uppercase text-black">Email Address</label>
+                    <label className="lux-label">Email Address</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-black stroke-[3]" />
-                      <Input 
+                      <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--lux-soft)] stroke-[1.75]" />
+                      <Input
                         type="email"
-                        placeholder="Enter your email" 
+                        placeholder="Enter your email"
                         autoComplete="email"
-                        className="neo-input h-12 bg-[var(--color-neo-surface)] pl-10 text-lg"
+                        className="h-12 pl-10 text-lg"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                       />
                     </div>
                   </div>
-                  <Button 
+                  <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="neo-btn mt-4 w-full bg-[var(--color-neo-cyan)] py-6 text-lg"
+                    className="glass-btn glass-btn-gold mt-4 w-full py-6 text-lg"
                   >
                     {isSubmitting ? 'Sending...' : 'Send Reset Link'}
                   </Button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setIsResetting(false)}
-                    className="mt-4 w-full text-sm font-bold uppercase text-zinc-500 underline decoration-2 underline-offset-4 hover:text-black"
+                    className="mt-4 w-full text-sm font-medium text-[var(--lux-muted)] underline decoration-1 underline-offset-4 transition-colors hover:text-[var(--lux-gold)]"
                   >
                     Back to Login
                   </button>
@@ -183,49 +183,49 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
               ) : (
                 <form onSubmit={handleSignIn} className="mt-8 space-y-4 text-left">
                   <div className="space-y-2">
-                    <label className="text-sm font-bold uppercase text-black">Email Address</label>
+                    <label className="lux-label">Email Address</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-black stroke-[3]" />
-                      <Input 
+                      <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--lux-soft)] stroke-[1.75]" />
+                      <Input
                         type="email"
-                        placeholder="admin@pulse.com" 
+                        placeholder="admin@pulse.com"
                         autoComplete="email"
-                        className="neo-input h-12 bg-[var(--color-neo-surface)] pl-10 text-lg"
+                        className="h-12 pl-10 text-lg"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold uppercase text-black">Password</label>
+                    <label className="lux-label">Password</label>
                     <div className="relative">
-                      <KeyRound className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-black stroke-[3]" />
-                      <Input 
+                      <KeyRound className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--lux-soft)] stroke-[1.75]" />
+                      <Input
                         type="password"
-                        placeholder="••••••••" 
+                        placeholder="••••••••"
                         autoComplete="current-password"
-                        className="neo-input h-12 bg-[var(--color-neo-surface)] pl-10 text-lg"
+                        className="h-12 pl-10 text-lg"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                       />
                     </div>
-                    <p className="text-xs font-bold uppercase text-zinc-500">
+                    <p className="text-xs text-[var(--lux-soft)]">
                       New accounts need a password with an uppercase character.
                     </p>
                   </div>
-                  
-                  <Button 
+
+                  <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="neo-btn mt-6 w-full bg-[var(--color-neo-violet)] py-6 text-lg"
+                    className="glass-btn glass-btn-gold mt-6 w-full py-6 text-lg"
                   >
                     {isSubmitting ? 'Authenticating...' : 'Sign In'}
                   </Button>
 
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setIsResetting(true)}
-                    className="mt-4 w-full text-sm font-bold uppercase text-zinc-500 underline decoration-2 underline-offset-4 hover:text-black"
+                    className="mt-4 w-full text-sm font-medium text-[var(--lux-muted)] underline decoration-1 underline-offset-4 transition-colors hover:text-[var(--lux-gold)]"
                   >
                     Forgot Password?
                   </button>
@@ -240,33 +240,33 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   if (accessStatus === 'pending' || accessStatus === 'rejected') {
     return (
-      <div className="min-h-screen bg-[var(--color-neo-bg)] p-4 sm:p-6">
+      <div className="min-h-screen p-4 sm:p-6">
         <div className="mx-auto flex min-h-screen w-full max-w-md items-center justify-center">
           <div className="w-full space-y-4">
             <div className="flex justify-end">
               <ThemeToggle className="w-auto px-3" />
             </div>
-            <div className="neo-box w-full space-y-6 bg-[var(--color-neo-surface)] p-8 text-center">
+            <div className="glass-panel w-full space-y-6 p-8 text-center">
               <div className="flex justify-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-4 border-black bg-[var(--color-neo-violet)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                  <Activity className="h-8 w-8 text-black stroke-[3]" />
+                <div className="flex h-16 w-16 items-center justify-center rounded-full border border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)]">
+                  <Activity className="h-8 w-8 stroke-[1.5] text-[var(--lux-gold)]" />
                 </div>
               </div>
               <div className="space-y-2">
-                <h1 className="text-2xl font-black uppercase text-black">
+                <h1 className="font-display text-2xl font-semibold text-[var(--lux-text)]">
                   {accessStatus === 'pending' ? 'You are on the waitlist!' : 'Access Denied'}
                 </h1>
-                <p className="font-medium text-zinc-600">
-                  {accessStatus === 'pending' 
+                <p className="text-[var(--lux-muted)]">
+                  {accessStatus === 'pending'
                     ? `Thanks for joining! Your account (${user.email}) has been added to our waitlist. We will notify you as soon as a spot opens up.`
                     : `Your account (${user.email}) has been denied access.`}
                 </p>
               </div>
-              <Button 
-                onClick={() => auth.signOut()} 
-                className="neo-btn w-full bg-black text-white hover:bg-zinc-800"
+              <Button
+                onClick={() => auth.signOut()}
+                className="glass-btn w-full"
               >
-                <LogOut className="mr-2 h-4 w-4" />
+                <LogOut className="mr-2 h-4 w-4 stroke-[1.75]" />
                 Sign Out
               </Button>
             </div>

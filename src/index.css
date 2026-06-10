@@ -1,67 +1,180 @@
 @import "tailwindcss";
 
-@theme {
-  --color-neo-yellow: #ffc900;
-  --color-neo-violet: #9b7cff;
-  --color-neo-cyan: #00f0ff;
-  --color-neo-green: #00ff00;
-  --color-neo-bg: #f4f4f0;
-  --color-neo-surface: #ffffff;
-  --color-neo-surface-muted: #ecece5;
-  --color-neo-surface-strong: #111111;
-  --color-neo-text: #111111;
-  --color-neo-muted: #5f6472;
-  --color-neo-soft: #8a90a0;
-  --color-neo-border: #000000;
-}
-
-@layer components {
-  .neo-box {
-    border: 3px solid var(--color-neo-border);
-    box-shadow: 4px 4px 0px 0px rgba(0,0,0,1);
-    border-radius: 0.75rem;
-    background-color: var(--color-neo-surface);
-    color: var(--color-neo-text);
-  }
-  .neo-btn {
-    border: 3px solid var(--color-neo-border);
-    box-shadow: 4px 4px 0px 0px rgba(0,0,0,1);
-    border-radius: 0.75rem;
-    font-weight: 700;
-    color: var(--color-neo-text);
-    background-color: var(--color-neo-surface);
-    transition: all 0.1s ease-in-out;
-  }
-  .neo-btn:hover {
-    transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0px 0px rgba(0,0,0,1);
-  }
-  .neo-btn:active {
-    transform: translate(4px, 4px);
-    box-shadow: 0px 0px 0px 0px rgba(0,0,0,1);
-  }
-  .neo-input {
-    border: 3px solid var(--color-neo-border);
-    box-shadow: 4px 4px 0px 0px rgba(0,0,0,1);
-    border-radius: 0.75rem;
-    background-color: var(--color-neo-surface);
-    color: var(--color-neo-text);
-    transition: all 0.1s ease-in-out;
-  }
-  .neo-input:focus {
-    transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0px 0px rgba(0,0,0,1);
-    outline: none;
-  }
-  .neo-input::placeholder {
-    color: var(--color-neo-muted);
-  }
-}
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/playfair-display";
 
 @custom-variant dark (&:is(.dark *));
+
+/* ─── Lux glass design tokens ─────────────────────────────────────────────
+   Luxury glassmorphism: deep charcoal base with champagne-gold accents in
+   dark mode, warm ivory glass in light mode. Panels are translucent and
+   blurred; borders are 1px hairlines; gold is reserved for primary actions
+   and focus states. All colors flow from these variables. */
+:root {
+  --lux-bg: #f3f0e9;
+  --lux-bg-glow:
+    radial-gradient(1100px 700px at 85% -10%, rgba(199, 164, 61, 0.14), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, rgba(120, 100, 200, 0.08), transparent 55%);
+  --lux-panel: rgba(255, 255, 255, 0.62);
+  --lux-panel-strong: rgba(255, 255, 255, 0.8);
+  --lux-fill: rgba(32, 28, 20, 0.05);
+  --lux-fill-strong: rgba(32, 28, 20, 0.1);
+  --lux-border: rgba(32, 28, 20, 0.12);
+  --lux-border-strong: rgba(32, 28, 20, 0.2);
+  --lux-text: #211d14;
+  --lux-muted: #6d6655;
+  --lux-soft: #99917c;
+  --lux-gold: #9c7c1e;
+  --lux-gold-bright: #c9a335;
+  --lux-gold-fill: rgba(176, 140, 38, 0.13);
+  --lux-gold-border: rgba(176, 140, 38, 0.42);
+  --lux-gold-glow: rgba(201, 163, 53, 0.35);
+  --lux-gold-grad: linear-gradient(135deg, #ecd28a 0%, #cda93f 55%, #b8922e 100%);
+  --lux-gold-ink: #2b2208;
+  --lux-emerald: #0f7a55;
+  --lux-emerald-fill: rgba(16, 142, 99, 0.12);
+  --lux-emerald-border: rgba(16, 142, 99, 0.38);
+  --lux-amber: #a06d14;
+  --lux-amber-fill: rgba(190, 134, 32, 0.14);
+  --lux-amber-border: rgba(190, 134, 32, 0.42);
+  --lux-ruby: #b13a44;
+  --lux-ruby-fill: rgba(192, 61, 72, 0.11);
+  --lux-ruby-border: rgba(192, 61, 72, 0.36);
+  --lux-sapphire: #3a5cb0;
+  --lux-sapphire-fill: rgba(74, 108, 196, 0.12);
+  --lux-sapphire-border: rgba(74, 108, 196, 0.38);
+  --lux-shadow: 0 18px 44px -18px rgba(45, 38, 20, 0.28);
+  --lux-shadow-soft: 0 10px 28px -14px rgba(45, 38, 20, 0.22);
+}
+
+.dark {
+  --lux-bg: #0b0d12;
+  --lux-bg-glow:
+    radial-gradient(1100px 700px at 85% -10%, rgba(212, 175, 55, 0.09), transparent 60%),
+    radial-gradient(900px 650px at -10% 115%, rgba(110, 96, 190, 0.08), transparent 55%);
+  --lux-panel: rgba(255, 255, 255, 0.05);
+  --lux-panel-strong: rgba(16, 19, 27, 0.78);
+  --lux-fill: rgba(255, 255, 255, 0.06);
+  --lux-fill-strong: rgba(255, 255, 255, 0.12);
+  --lux-border: rgba(255, 255, 255, 0.09);
+  --lux-border-strong: rgba(255, 255, 255, 0.17);
+  --lux-text: #f3efe4;
+  --lux-muted: #b4ad9c;
+  --lux-soft: #87816f;
+  --lux-gold: #d8b85e;
+  --lux-gold-bright: #e7cf8f;
+  --lux-gold-fill: rgba(212, 175, 55, 0.13);
+  --lux-gold-border: rgba(212, 175, 55, 0.4);
+  --lux-gold-glow: rgba(212, 175, 55, 0.28);
+  --lux-gold-grad: linear-gradient(135deg, #ecd28a 0%, #d4af37 55%, #b08a22 100%);
+  --lux-gold-ink: #2b2208;
+  --lux-emerald: #5fd6a4;
+  --lux-emerald-fill: rgba(64, 200, 144, 0.12);
+  --lux-emerald-border: rgba(64, 200, 144, 0.35);
+  --lux-amber: #ecbd6d;
+  --lux-amber-fill: rgba(236, 176, 90, 0.13);
+  --lux-amber-border: rgba(236, 176, 90, 0.4);
+  --lux-ruby: #f08a92;
+  --lux-ruby-fill: rgba(235, 105, 115, 0.13);
+  --lux-ruby-border: rgba(235, 105, 115, 0.38);
+  --lux-sapphire: #93b0f5;
+  --lux-sapphire-fill: rgba(110, 140, 230, 0.13);
+  --lux-sapphire-border: rgba(110, 140, 230, 0.38);
+  --lux-shadow: 0 22px 54px -16px rgba(0, 0, 0, 0.6);
+  --lux-shadow-soft: 0 12px 30px -14px rgba(0, 0, 0, 0.5);
+}
+
+@layer components {
+  .font-display {
+    font-family: 'Playfair Display Variable', Georgia, 'Times New Roman', serif;
+  }
+  .glass-panel {
+    position: relative;
+    background: var(--lux-panel);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid var(--lux-border);
+    border-radius: 1.25rem;
+    box-shadow: var(--lux-shadow-soft);
+    color: var(--lux-text);
+  }
+  .glass-strong {
+    background: var(--lux-panel-strong);
+    -webkit-backdrop-filter: blur(26px) saturate(160%);
+    backdrop-filter: blur(26px) saturate(160%);
+    border: 1px solid var(--lux-border);
+    box-shadow: var(--lux-shadow);
+    color: var(--lux-text);
+  }
+  .glass-btn {
+    border: 1px solid var(--lux-border-strong);
+    border-radius: 9999px;
+    background-color: var(--lux-fill);
+    color: var(--lux-text);
+    font-weight: 600;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, filter 0.18s ease;
+  }
+  .glass-btn:hover {
+    transform: translateY(-1px);
+    border-color: var(--lux-gold-border);
+    box-shadow: 0 8px 26px -10px var(--lux-gold-glow);
+  }
+  .glass-btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+  .glass-btn-gold {
+    background: var(--lux-gold-grad);
+    border-color: var(--lux-gold-border);
+    color: var(--lux-gold-ink);
+  }
+  .glass-btn-gold:hover {
+    filter: brightness(1.05);
+  }
+  .glass-btn-emerald {
+    background-color: var(--lux-emerald-fill);
+    border-color: var(--lux-emerald-border);
+    color: var(--lux-emerald);
+  }
+  .glass-btn-ruby {
+    background-color: var(--lux-ruby-fill);
+    border-color: var(--lux-ruby-border);
+    color: var(--lux-ruby);
+  }
+  .glass-input {
+    background-color: var(--lux-fill);
+    border: 1px solid var(--lux-border);
+    border-radius: 0.9rem;
+    color: var(--lux-text);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .glass-input::placeholder {
+    color: var(--lux-soft);
+  }
+  .glass-input:focus {
+    outline: none;
+    border-color: var(--lux-gold-border);
+    box-shadow: 0 0 0 3px var(--lux-gold-glow);
+  }
+  .glass-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--lux-border);
+    border-radius: 9999px;
+    background-color: var(--lux-fill);
+    color: var(--lux-text);
+  }
+  .lux-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--lux-muted);
+  }
+}
 
 @theme inline {
     --font-heading: var(--font-sans);
@@ -142,18 +255,6 @@
 }
 
 .dark {
-    --color-neo-yellow: #9c8400;
-    --color-neo-violet: #4c3d95;
-    --color-neo-cyan: #157f8d;
-    --color-neo-green: #1e8e4a;
-    --color-neo-bg: #10141c;
-    --color-neo-surface: #1b212c;
-    --color-neo-surface-muted: #262d3a;
-    --color-neo-surface-strong: #0d1117;
-    --color-neo-text: #f4f7fb;
-    --color-neo-muted: #b2b8c7;
-    --color-neo-soft: #8e95a7;
-    --color-neo-border: #000000;
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.205 0 0);
@@ -200,93 +301,11 @@
     }
   body {
     @apply bg-background text-foreground;
-    background-color: var(--color-neo-bg);
-    color: var(--color-neo-text);
+    background-color: var(--lux-bg);
+    background-image: var(--lux-bg-glow);
+    background-attachment: fixed;
+    color: var(--lux-text);
     }
-}
-
-.dark .bg-white {
-  background-color: var(--color-neo-surface) !important;
-}
-
-.dark .bg-zinc-50,
-.dark .bg-zinc-50\/90,
-.dark .bg-zinc-100,
-.dark .bg-zinc-200 {
-  background-color: var(--color-neo-surface-muted) !important;
-}
-
-.dark .bg-black {
-  background-color: var(--color-neo-surface-strong) !important;
-}
-
-.dark .text-black,
-.dark .text-zinc-900,
-.dark .text-zinc-800 {
-  color: var(--color-neo-text) !important;
-}
-
-.dark .text-zinc-600,
-.dark .text-zinc-500 {
-  color: var(--color-neo-muted) !important;
-}
-
-.dark .text-zinc-400 {
-  color: var(--color-neo-soft) !important;
-}
-
-.dark .border-zinc-50,
-.dark .border-zinc-200,
-.dark .border-blue-200,
-.dark .border-green-200,
-.dark .border-orange-200 {
-  border-color: var(--border) !important;
-}
-
-.dark .hover\:bg-zinc-100:hover,
-.dark .hover\:bg-zinc-300:hover {
-  background-color: var(--color-neo-surface-muted) !important;
-}
-
-.dark .hover\:bg-zinc-800:hover {
-  background-color: var(--color-neo-surface-strong) !important;
-}
-
-.dark .hover\:text-black:hover {
-  color: var(--color-neo-text) !important;
-}
-
-.dark .bg-orange-50 {
-  background-color: rgb(249 115 22 / 0.16) !important;
-}
-
-.dark .bg-orange-200 {
-  background-color: rgb(249 115 22 / 0.24) !important;
-}
-
-.dark .text-orange-900 {
-  color: #ffd3b3 !important;
-}
-
-.dark .text-orange-700 {
-  color: #ffb870 !important;
-}
-
-.dark .bg-green-50 {
-  background-color: rgb(34 197 94 / 0.16) !important;
-}
-
-.dark .text-green-900 {
-  color: #d3f9df !important;
-}
-
-.dark .text-green-800,
-.dark .text-green-700 {
-  color: #97ecb2 !important;
-}
-
-.dark .hover\:bg-green-100:hover {
-  background-color: rgb(34 197 94 / 0.22) !important;
 }
 
 input:-webkit-autofill,
@@ -295,10 +314,36 @@ input:-webkit-autofill:focus,
 textarea:-webkit-autofill,
 textarea:-webkit-autofill:hover,
 textarea:-webkit-autofill:focus {
-  -webkit-text-fill-color: var(--color-neo-text);
-  box-shadow: 0 0 0px 1000px var(--color-neo-surface) inset;
+  -webkit-text-fill-color: var(--lux-text);
+  box-shadow: 0 0 0px 1000px var(--lux-bg) inset;
   transition: background-color 9999s ease-in-out 0s;
-  caret-color: var(--color-neo-text);
+  caret-color: var(--lux-text);
+}
+
+/* Slim translucent scrollbars to match the glass surfaces. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--lux-fill-strong);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--lux-gold-border);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Electron-only drag regions. macOS frameless windows (titleBarStyle:
@@ -317,26 +362,28 @@ textarea:-webkit-autofill:focus {
 .rich-card-editor {
   height: clamp(360px, calc(100dvh - 360px), 620px);
   overscroll-behavior: contain;
+  overflow-wrap: anywhere;
 }
 
 .rich-card-editor:empty::before {
-  color: var(--color-neo-muted);
+  color: var(--lux-soft);
   content: "Write your learning here.";
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .rich-card-editor h1 {
+  font-family: 'Playfair Display Variable', Georgia, serif;
   font-size: 1.875rem;
-  font-weight: 900;
-  line-height: 1.1;
+  font-weight: 600;
+  line-height: 1.15;
   margin: 0 0 1rem;
-  text-transform: uppercase;
 }
 
 .rich-card-editor h2 {
+  font-family: 'Playfair Display Variable', Georgia, serif;
   font-size: 1.375rem;
-  font-weight: 900;
-  line-height: 1.2;
+  font-weight: 600;
+  line-height: 1.25;
   margin: 0 0 0.875rem;
 }
 
@@ -361,22 +408,24 @@ textarea:-webkit-autofill:focus {
 }
 
 .rich-card-editor blockquote {
-  border-left: 4px solid black;
+  border-left: 2px solid var(--lux-gold-border);
   font-style: italic;
+  color: var(--lux-muted);
   padding-left: 1rem;
 }
 
 .rich-card-editor code {
-  background: rgb(0 0 0 / 0.1);
+  background: var(--lux-fill-strong);
   border-radius: 4px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   padding: 0.125rem 0.25rem;
 }
 
 .rich-card-editor a {
-  font-weight: 800;
+  color: var(--lux-gold);
+  font-weight: 600;
   text-decoration: underline;
-  text-decoration-thickness: 2px;
+  text-decoration-thickness: 1px;
   text-underline-offset: 4px;
 }
 
@@ -397,35 +446,6 @@ textarea:-webkit-autofill:focus {
     height: 100%;
     max-height: 100%;
   }
-}
-
-@media (min-width: 80rem) {
-  .pulse-nav-closed .brain-workspace-grid {
-    grid-template-columns: 260px minmax(360px, 1fr) minmax(500px, 0.9fr);
-  }
-
-  .pulse-nav-closed .brain-chat-card {
-    grid-column: auto;
-  }
-
-  .pulse-nav-closed .brain-chat-control-row {
-    grid-template-columns: minmax(0, 1fr) minmax(176px, 220px);
-  }
-}
-
-@media (min-width: 96rem) {
-  .brain-workspace-grid {
-    grid-template-columns: 260px minmax(420px, 1fr) minmax(440px, 0.75fr);
-  }
-
-  .brain-chat-card {
-    grid-column: auto;
-  }
-
-  .pulse-nav-closed .brain-workspace-grid {
-    grid-template-columns: 280px minmax(520px, 1fr) minmax(580px, 0.75fr);
-  }
-
 }
 
 @media (max-height: 760px) and (max-width: 63.999rem) {

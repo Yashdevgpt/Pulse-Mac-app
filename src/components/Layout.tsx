@@ -46,28 +46,30 @@ export default function Layout() {
 
   return (
     <div className={cn(
-      'min-h-screen bg-[var(--color-neo-bg)] text-[var(--color-neo-text)] lg:flex lg:h-screen lg:min-h-0 lg:overflow-hidden',
+      'min-h-screen text-[var(--lux-text)] lg:flex lg:h-screen lg:min-h-0 lg:overflow-hidden',
       isNavOpen ? 'pulse-nav-open' : 'pulse-nav-closed'
     )}>
       {isNavOpen && (
-        <aside className="flex w-full shrink-0 flex-col border-r-4 border-black bg-[var(--color-neo-surface)] shadow-[4px_0px_0px_0px_rgba(0,0,0,1)] lg:w-64">
-          <div className="app-drag flex h-16 items-center justify-between gap-3 border-b-4 border-black bg-[var(--color-neo-yellow)] px-5">
+        <aside className="glass-strong flex w-full shrink-0 flex-col border-0 border-r border-[var(--lux-border)] lg:w-64">
+          <div className="app-drag flex h-16 items-center justify-between gap-3 border-b border-[var(--lux-border)] px-5">
             <Link
               to="/"
-              className="app-no-drag flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1 pr-2 text-black transition-transform hover:translate-x-[1px] hover:translate-y-[1px]"
+              className="app-no-drag flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1 pr-2 transition-opacity hover:opacity-80"
               aria-label="Go to Bridge"
             >
-              <Activity className="h-8 w-8 shrink-0 text-black stroke-[3]" />
-              <span className="truncate text-2xl font-black uppercase tracking-tight text-black">Pulse</span>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)]">
+                <Activity className="h-5 w-5 stroke-[1.75] text-[var(--lux-gold)]" />
+              </span>
+              <span className="font-display truncate text-2xl font-semibold tracking-tight text-[var(--lux-text)]">Pulse</span>
             </Link>
             <Button
               variant="ghost"
               size="icon-sm"
-              className="app-no-drag neo-btn shrink-0 bg-[var(--color-neo-yellow)]"
+              className="app-no-drag shrink-0 text-[var(--lux-muted)] hover:text-[var(--lux-text)]"
               onClick={() => setIsNavOpen(false)}
               aria-label="Close navigation"
             >
-              <X className="h-4 w-4 stroke-[3]" />
+              <X className="h-4 w-4 stroke-[1.75]" />
             </Button>
           </div>
 
@@ -75,7 +77,7 @@ export default function Layout() {
             <ThemeToggle className="w-full justify-center" />
           </div>
 
-          <nav className="flex-1 space-y-2 px-4 py-4">
+          <nav className="flex-1 space-y-1.5 px-4 py-4">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
               return (
@@ -83,16 +85,16 @@ export default function Layout() {
                   key={item.name}
                   to={item.href}
                   className={cn(
-                    'group flex items-center rounded-xl border-3 px-4 py-3 text-sm font-bold transition-all',
+                    'group flex items-center rounded-xl border px-4 py-3 text-sm font-medium transition-all',
                     isActive
-                      ? 'translate-x-[2px] translate-y-[2px] border-black bg-[var(--color-neo-cyan)] text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                      : 'border-transparent text-zinc-600 hover:bg-zinc-100 hover:text-black'
+                      ? 'border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)] text-[var(--lux-gold)] shadow-[0_8px_22px_-12px_var(--lux-gold-glow)]'
+                      : 'border-transparent text-[var(--lux-muted)] hover:bg-[var(--lux-fill)] hover:text-[var(--lux-text)]'
                   )}
                 >
                   <item.icon
                     className={cn(
-                      isActive ? 'text-black' : 'text-zinc-500 group-hover:text-black',
-                      'mr-3 h-5 w-5 flex-shrink-0 -ml-1 stroke-[2.5] transition-colors'
+                      isActive ? 'text-[var(--lux-gold)]' : 'text-[var(--lux-soft)] group-hover:text-[var(--lux-text)]',
+                      'mr-3 h-5 w-5 flex-shrink-0 -ml-1 stroke-[1.75] transition-colors'
                     )}
                     aria-hidden="true"
                   />
@@ -102,23 +104,23 @@ export default function Layout() {
             })}
           </nav>
 
-          <div className="border-t-4 border-black bg-[var(--color-neo-violet)] p-4">
-            <div className="neo-box flex items-center justify-between bg-[var(--color-neo-surface)] p-3">
+          <div className="border-t border-[var(--lux-border)] p-4">
+            <div className="glass-panel flex items-center justify-between p-3">
               <div className="flex min-w-0 items-center">
                 {user?.photoURL ? (
-                  <img src={user.photoURL} alt="Avatar" className="h-9 w-9 rounded-lg border-2 border-black" referrerPolicy="no-referrer" />
+                  <img src={user.photoURL} alt="Avatar" className="h-9 w-9 rounded-full border border-[var(--lux-border-strong)]" referrerPolicy="no-referrer" />
                 ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-black bg-black text-sm font-bold text-white">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)] text-sm font-semibold text-[var(--lux-gold)]">
                     {appUser?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
                   </div>
                 )}
                 <div className="ml-3 min-w-0">
-                  <p className="truncate text-sm font-bold text-black">{appUser?.name || user?.email?.split('@')[0] || 'User'}</p>
-                  <p className="truncate text-xs font-medium text-zinc-600">{user?.email}</p>
+                  <p className="truncate text-sm font-semibold text-[var(--lux-text)]">{appUser?.name || user?.email?.split('@')[0] || 'User'}</p>
+                  <p className="truncate text-xs text-[var(--lux-muted)]">{user?.email}</p>
                 </div>
               </div>
-              <button onClick={() => signOut(auth)} className="rounded-md p-1 text-black transition-transform hover:scale-110 hover:text-red-600" aria-label="Sign out">
-                <LogOut className="h-5 w-5 stroke-[3]" />
+              <button onClick={() => signOut(auth)} className="rounded-md p-1 text-[var(--lux-muted)] transition-colors hover:text-[var(--lux-ruby)]" aria-label="Sign out">
+                <LogOut className="h-5 w-5 stroke-[1.75]" />
               </button>
             </div>
           </div>
@@ -127,25 +129,25 @@ export default function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col lg:min-h-0">
         {!isNavOpen && (
-          <header className="app-drag border-b-4 border-black bg-[var(--color-neo-surface)]">
+          <header className="app-drag glass-strong border-0 border-b border-[var(--lux-border)]">
             <div className="flex items-center justify-between gap-3 px-4 py-3 lg:pl-20">
               <Button
                 variant="ghost"
                 size="icon"
-                className="app-no-drag neo-btn bg-[var(--color-neo-surface)]"
+                className="app-no-drag glass-btn"
                 onClick={() => setIsNavOpen(true)}
                 aria-expanded={false}
                 aria-label="Open navigation"
               >
-                <Menu className="h-5 w-5 stroke-[3]" />
+                <Menu className="h-5 w-5 stroke-[1.75]" />
               </Button>
               <Link
                 to="/"
-                className="app-no-drag flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-black transition-transform hover:translate-x-[1px] hover:translate-y-[1px]"
+                className="app-no-drag flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 transition-opacity hover:opacity-80"
                 aria-label="Go to Bridge"
               >
-                <Activity className="h-5 w-5 flex-shrink-0 text-black stroke-[3]" />
-                <span className="truncate text-sm font-black uppercase tracking-tight text-black">Pulse</span>
+                <Activity className="h-5 w-5 flex-shrink-0 stroke-[1.75] text-[var(--lux-gold)]" />
+                <span className="font-display truncate text-base font-semibold tracking-tight text-[var(--lux-text)]">Pulse</span>
               </Link>
               <div className="h-11 w-11" aria-hidden="true" />
             </div>

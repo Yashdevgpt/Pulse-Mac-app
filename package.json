@@ -19,6 +19,7 @@
   "dependencies": {
     "@base-ui/react": "^1.3.0",
     "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource-variable/playfair-display": "^5.2.8",
     "@google/genai": "^1.29.0",
     "@supabase/supabase-js": "^2.103.3",
     "@tailwindcss/vite": "^4.1.14",
@@ -91,7 +92,12 @@
     ],
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
       ],
       "category": "public.app-category.productivity",
       "icon": "build/icon.icns",

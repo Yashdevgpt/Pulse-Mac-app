@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { db, DSP, Tag, Log } from '@/lib/db';
@@ -8,7 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { Check, ChevronsUpDown, LayoutDashboard, Plus, Search } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
 import { cn } from '@/lib/utils';
 import { createDspSlug } from '@/lib/slugs';
 import { autoIndexDspRecord, autoIndexFleetLog } from '@/lib/brainApi';
@@ -164,6 +165,13 @@ export default function Bridge() {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [status, setStatus] = useState<'Ongoing' | 'Completed' | 'None'>('None');
   const [isDspOpen, setIsDspOpen] = useState(false);
+  const [dspQuery, setDspQuery] = useState('');
+
+  const filteredDsps = useMemo(() => {
+    const query = dspQuery.trim().toLowerCase();
+    if (!query) return dsps;
+    return dsps.filter(dsp => dsp.name.toLowerCase().includes(query));
+  }, [dsps, dspQuery]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -251,20 +259,17 @@ export default function Bridge() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-black text-black tracking-tight uppercase">
-          {greeting}
-        </h1>
-        <p className="text-zinc-600 mt-2 font-medium">
-          It's {format(currentTime, 'EEEE, MMMM do')} at {format(currentTime, 'h:mm a')}. What's the update?
-        </p>
-      </div>
+      <PageHeader
+        icon={LayoutDashboard}
+        title={greeting}
+        subtitle={<>It's {format(currentTime, 'EEEE, MMMM do')} at {format(currentTime, 'h:mm a')}. What's the update?</>}
+      />
 
-      <div className="neo-box p-6 space-y-6 bg-[var(--color-neo-bg)]">
+      <div className="glass-panel p-6 space-y-6">
         <div>
           <Textarea
             placeholder="Log your latest activity, meeting notes, or monitoring updates..."
-            className="neo-input min-h-[150px] text-base resize-none bg-white"
+            className="min-h-[150px] text-base resize-none"
             value={content}
             onChange={(e) => setContent(e.target.value)}
           />
@@ -272,15 +277,21 @@ export default function Bridge() {
 
         <div className="flex flex-col sm:flex-row gap-6">
           <div className="flex-1 space-y-3">
-            <label className="text-sm font-bold text-black uppercase tracking-wider">Select DSP</label>
-            <Popover open={isDspOpen} onOpenChange={setIsDspOpen}>
+            <label className="lux-label">Select DSP</label>
+            <Popover
+              open={isDspOpen}
+              onOpenChange={(open) => {
+                setIsDspOpen(open);
+                if (!open) setDspQuery('');
+              }}
+            >
               <PopoverTrigger
                 render={
                   <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={isDspOpen}
-                    className="neo-btn w-full justify-between font-normal bg-white"
+                    className="glass-btn h-10 w-full justify-between px-4 font-normal"
                   />
                 }
               >
@@ -289,14 +300,14 @@ export default function Bridge() {
                   : "Select DSP..."}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </PopoverTrigger>
-              <PopoverContent className="neo-box w-[300px] p-0">
-                <div className="p-2 border-b-3 border-black">
+              <PopoverContent className="w-[300px] p-0">
+                <div className="p-2 border-b border-[var(--lux-border)]">
                   <div className="flex gap-2">
-                    <Input 
-                      placeholder="New DSP name..." 
+                    <Input
+                      placeholder="New DSP name..."
                       value={newDspName}
                       onChange={(e) => setNewDspName(e.target.value)}
-                      className="neo-input h-8 text-sm"
+                      className="h-8 text-sm"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
@@ -304,21 +315,37 @@ export default function Bridge() {
                         }
                       }}
                     />
-                    <Button size="sm" className="neo-btn bg-[var(--color-neo-cyan)]" onClick={handleCreateDsp} disabled={!newDspName.trim()}>
-                      <Plus className="h-4 w-4" />
+                    <Button size="sm" className="glass-btn glass-btn-gold" onClick={handleCreateDsp} disabled={!newDspName.trim()}>
+                      <Plus className="h-4 w-4 stroke-[1.75]" />
                     </Button>
                   </div>
                 </div>
+                <div className="border-b border-[var(--lux-border)] p-2">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 stroke-[1.75] text-[var(--lux-soft)]" />
+                    <Input
+                      placeholder="Search DSPs..."
+                      value={dspQuery}
+                      onChange={(e) => setDspQuery(e.target.value)}
+                      className="h-8 pl-8 text-sm"
+                      autoFocus
+                    />
+                  </div>
+                </div>
                 <div className="max-h-[200px] overflow-y-auto p-1">
-                  {dsps.length === 0 && (
-                    <p className="p-2 text-sm text-zinc-500 text-center font-bold">No DSPs found.</p>
+                  {filteredDsps.length === 0 && (
+                    <p className="p-2 text-sm text-[var(--lux-muted)] text-center">
+                      {dsps.length === 0 ? 'No DSPs found.' : 'No DSPs match your search.'}
+                    </p>
                   )}
-                  {dsps.map((dsp) => (
+                  {filteredDsps.map((dsp) => (
                     <div
                       key={dsp.id}
                       className={cn(
-                        "relative flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-[var(--color-neo-yellow)] hover:border-2 hover:border-black font-medium transition-all",
-                        selectedDspId === dsp.id ? "bg-[var(--color-neo-yellow)] border-2 border-black" : "border-2 border-transparent"
+                        "relative flex cursor-pointer select-none items-center rounded-lg border px-2 py-1.5 text-sm font-medium outline-none transition-colors hover:bg-[var(--lux-fill)]",
+                        selectedDspId === dsp.id
+                          ? "border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)] text-[var(--lux-gold)]"
+                          : "border-transparent text-[var(--lux-text)]"
                       )}
                       onClick={() => {
                         setSelectedDspId(dsp.id);
@@ -327,7 +354,7 @@ export default function Bridge() {
                     >
                       <Check
                         className={cn(
-                          "mr-2 h-4 w-4",
+                          "mr-2 h-4 w-4 stroke-[1.75]",
                           selectedDspId === dsp.id ? "opacity-100" : "opacity-0"
                         )}
                       />
@@ -340,7 +367,7 @@ export default function Bridge() {
           </div>
 
           <div className="flex-1 space-y-3">
-            <label className="text-sm font-bold text-black uppercase tracking-wider">Task Status</label>
+            <label className="lux-label">Task Status</label>
             <div className="flex gap-2">
               {(['None', 'Ongoing', 'Completed'] as const).map((s) => (
                 <Button
@@ -349,10 +376,10 @@ export default function Bridge() {
                   size="sm"
                   onClick={() => setStatus(s)}
                   className={cn(
-                    "neo-btn",
-                    status === s && s === 'Ongoing' ? 'bg-[var(--color-neo-yellow)]' : 
-                    status === s && s === 'Completed' ? 'bg-[var(--color-neo-green)]' : 
-                    status === s ? 'bg-black text-white' : 'bg-white'
+                    "glass-btn",
+                    status === s && s === 'Ongoing' ? 'bg-[var(--lux-amber-fill)] border-[var(--lux-amber-border)] text-[var(--lux-amber)]' :
+                    status === s && s === 'Completed' ? 'bg-[var(--lux-emerald-fill)] border-[var(--lux-emerald-border)] text-[var(--lux-emerald)]' :
+                    status === s ? 'bg-[var(--lux-fill-strong)] border-[var(--lux-border-strong)]' : ''
                   )}
                 >
                   {s}
@@ -363,20 +390,20 @@ export default function Bridge() {
         </div>
 
         <div className="space-y-3">
-          <label className="text-sm font-bold text-black uppercase tracking-wider">Tags</label>
+          <label className="lux-label">Tags</label>
           <div className="flex flex-wrap gap-2">
             {tags.map((tag) => {
               const isSelected = selectedTagIds.includes(tag.id);
               return (
                 <Badge
                   key={tag.id}
-                  variant={isSelected ? 'default' : 'outline'}
                   className={cn(
-                    "cursor-pointer transition-all border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] hover:translate-x-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]",
-                    isSelected ? tag.color : "bg-white text-black"
+                    "cursor-pointer px-3 py-1 transition-all hover:-translate-y-[1px]",
+                    isSelected && "border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)]"
                   )}
                   onClick={() => toggleTag(tag.id)}
                 >
+                  <span className={cn('h-2 w-2 rounded-full', tag.color)} aria-hidden />
                   {tag.name}
                 </Badge>
               );
@@ -384,8 +411,8 @@ export default function Bridge() {
           </div>
         </div>
 
-        <div className="pt-4 border-t-3 border-black flex justify-end">
-          <Button onClick={handleSubmit} size="lg" className="neo-btn bg-[var(--color-neo-violet)] w-full sm:w-auto text-lg px-8">
+        <div className="pt-4 border-t border-[var(--lux-border)] flex justify-end">
+          <Button onClick={handleSubmit} size="lg" className="glass-btn glass-btn-gold w-full sm:w-auto text-base px-8">
             Log Update
           </Button>
         </div>

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import PageHeader from '@/components/PageHeader';
 import { buildPulseMarkdownExport, type MarkdownExportStats } from '@/lib/dataExport';
 
 const downloadBlob = (blob: Blob, fileName: string) => {
@@ -42,86 +43,80 @@ export default function Archive() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-8 flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl border-3 border-black bg-[var(--color-neo-yellow)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <ArchiveIcon className="h-6 w-6 text-black stroke-[3]" />
-        </div>
-        <div>
-          <h1 className="text-4xl font-black uppercase tracking-tight text-black">Archive</h1>
-          <p className="mt-1 font-medium text-zinc-600">Export Pulse records as a local Markdown ZIP.</p>
-        </div>
-      </div>
+      <PageHeader
+        icon={ArchiveIcon}
+        title="Archive"
+        subtitle="Export Pulse records as a local Markdown ZIP."
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="neo-box space-y-6 bg-white p-6">
+        <div className="glass-panel space-y-6 p-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-black">
-                <CalendarDays className="h-4 w-4 stroke-[3]" />
+              <label className="lux-label flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 stroke-[1.75]" />
                 Start Date
               </label>
               <Input
                 type="date"
                 value={startDate}
                 onChange={(event) => setStartDate(event.target.value)}
-                className="neo-input"
               />
             </div>
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-black">
-                <CalendarDays className="h-4 w-4 stroke-[3]" />
+              <label className="lux-label flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 stroke-[1.75]" />
                 End Date
               </label>
               <Input
                 type="date"
                 value={endDate}
                 onChange={(event) => setEndDate(event.target.value)}
-                className="neo-input"
               />
             </div>
           </div>
 
-          <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border-3 border-black bg-zinc-50 p-4 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+          <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-[var(--lux-border)] bg-[var(--lux-fill)] p-4 transition-colors hover:border-[var(--lux-gold-border)]">
             <span className="flex min-w-0 items-center gap-3">
-              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border-3 border-black bg-[var(--color-neo-cyan)]">
-                <Paperclip className="h-5 w-5 stroke-[3]" />
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)]">
+                <Paperclip className="h-5 w-5 stroke-[1.75] text-[var(--lux-gold)]" />
               </span>
               <span className="min-w-0">
-                <span className="block text-sm font-black uppercase text-black">Include Attachments</span>
-                <span className="block text-xs font-medium text-zinc-600">Log files are copied into the ZIP.</span>
+                <span className="block text-sm font-semibold text-[var(--lux-text)]">Include Attachments</span>
+                <span className="block text-xs text-[var(--lux-muted)]">Log files are copied into the ZIP.</span>
               </span>
             </span>
             <input
               type="checkbox"
               checked={includeAttachments}
               onChange={(event) => setIncludeAttachments(event.target.checked)}
-              className="h-6 w-6 accent-black"
+              className="h-5 w-5 accent-[var(--lux-gold-bright)]"
             />
           </label>
 
           <div className="grid gap-3 sm:grid-cols-2">
             {['Profile', 'Fleet', 'Logbook', 'Tags', 'Watchtower', 'Brain Cards'].map((item) => (
-              <div key={item} className="flex items-center gap-2 rounded-lg border-2 border-black bg-white px-3 py-2 text-sm font-bold text-black">
-                <ShieldCheck className="h-4 w-4 text-emerald-600 stroke-[3]" />
+              <div key={item} className="flex items-center gap-2 rounded-full border border-[var(--lux-border)] bg-[var(--lux-fill)] px-3.5 py-2 text-sm font-medium text-[var(--lux-text)]">
+                <ShieldCheck className="h-4 w-4 stroke-[1.75] text-[var(--lux-emerald)]" />
                 {item}
               </div>
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 border-t-3 border-black pt-5">
+          <div className="flex flex-wrap items-center gap-3 border-t border-[var(--lux-border)] pt-5">
             <Button
               onClick={handleExport}
               disabled={isExporting}
-              className="neo-btn bg-[var(--color-neo-green)] text-black"
+              className="glass-btn glass-btn-gold"
             >
               {isExporting ? (
                 <>
-                  <FileArchive className="h-4 w-4 animate-pulse stroke-[3]" />
+                  <FileArchive className="h-4 w-4 animate-pulse stroke-[1.75]" />
                   Exporting
                 </>
               ) : (
                 <>
-                  <Download className="h-4 w-4 stroke-[3]" />
+                  <Download className="h-4 w-4 stroke-[1.75]" />
                   Download ZIP
                 </>
               )}
@@ -132,7 +127,7 @@ export default function Archive() {
                 setStartDate('');
                 setEndDate('');
               }}
-              className="neo-btn bg-zinc-200 text-black"
+              className="glass-btn"
               disabled={isExporting}
             >
               All Time
@@ -140,19 +135,19 @@ export default function Archive() {
           </div>
         </div>
 
-        <aside className="neo-box h-fit space-y-4 bg-[var(--color-neo-yellow)] p-5">
+        <aside className="glass-panel h-fit space-y-4 border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)] p-5">
           <div className="flex items-center gap-3">
-            <FileArchive className="h-6 w-6 text-black stroke-[3]" />
-            <h2 className="text-xl font-black uppercase text-black">Local Only</h2>
+            <FileArchive className="h-6 w-6 stroke-[1.75] text-[var(--lux-gold)]" />
+            <h2 className="font-display text-xl font-semibold text-[var(--lux-text)]">Local Only</h2>
           </div>
-          <div className="space-y-2 text-sm font-bold text-black">
+          <div className="space-y-2 text-sm font-medium text-[var(--lux-text)]">
             <p>No backup file is written to Firestore.</p>
             <p>No Supabase vector rows are exported.</p>
             <p>Brain chats and AI keys are omitted.</p>
           </div>
           {lastExport && (
-            <div className="border-t-3 border-black pt-4 text-sm font-bold text-black">
-              <p className="mb-2 uppercase">Last Export</p>
+            <div className="border-t border-[var(--lux-gold-border)] pt-4 text-sm font-medium text-[var(--lux-text)]">
+              <p className="lux-label mb-2">Last Export</p>
               <p>{lastExport.dateRangeLabel}</p>
               <p>{lastExport.counts.dsps} DSPs</p>
               <p>{lastExport.counts.logs} logs</p>

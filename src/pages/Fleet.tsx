@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
-import { Search, Activity, Clock, Edit2, Save, Star, Trash2, X } from 'lucide-react';
+import { Search, Activity, BookOpen, Clock, Edit2, Save, Star, Trash2, X } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
+import EmptyState from '@/components/EmptyState';
 import { toast } from 'sonner';
 import { createDspSlug } from '@/lib/slugs';
 import { autoIndexDspRecord, deleteBrainMemorySource } from '@/lib/brainApi';
@@ -146,40 +148,44 @@ export default function Fleet() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tight uppercase">Fleet</h1>
-          <p className="text-zinc-600 mt-2 font-medium">Directory of all your DSP integrations and partners.</p>
-        </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-black stroke-[3]" />
-          <Input 
-            placeholder="Search DSPs..." 
-            className="neo-input pl-10 h-12 text-lg bg-white"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
+      <PageHeader
+        icon={BookOpen}
+        title="Fleet"
+        subtitle="Directory of all your DSP integrations and partners."
+        compact
+        actions={
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[var(--lux-soft)] stroke-[1.75]" />
+            <Input
+              placeholder="Search DSPs..."
+              className="pl-10 h-12 text-lg"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        }
+      />
 
       {filteredDsps.length === 0 ? (
-        <div className="text-center py-20 neo-box bg-white">
-          <p className="text-black font-bold text-lg">No DSPs found. Create one from the Bridge.</p>
-        </div>
+        <EmptyState
+          icon={BookOpen}
+          title="No DSPs found"
+          description="Create one from the Bridge."
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredDsps.map(dsp => {
             const stats = getDspStats(dsp.id);
             const isEditing = editingDspId === dsp.id;
             return (
-              <Card key={dsp.id} className="neo-box h-full hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all bg-white flex flex-col overflow-hidden p-0">
-                <CardHeader className="p-4 border-b-3 border-black bg-white">
-                  <CardTitle className="text-xl font-black text-black flex justify-between items-center uppercase gap-3">
+              <Card key={dsp.id} className="h-full transition-all hover:-translate-y-1 hover:border-[var(--lux-gold-border)] hover:shadow-[var(--lux-shadow)] flex flex-col overflow-hidden p-0">
+                <CardHeader className="p-4 border-b border-[var(--lux-border)]">
+                  <CardTitle className="font-display text-xl font-semibold text-[var(--lux-text)] flex justify-between items-center gap-3">
                     {isEditing ? (
                       <Input
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="neo-input h-10 text-base bg-white"
+                        className="h-10 text-base"
                         autoFocus
                       />
                     ) : (
@@ -187,63 +193,63 @@ export default function Fleet() {
                         <button
                           type="button"
                           onClick={() => handleToggleStar(dsp)}
-                          className={`shrink-0 rounded-md border-2 border-black p-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-colors ${
+                          className={`shrink-0 rounded-full border p-1.5 transition-colors ${
                             dsp.starred
-                              ? 'bg-[var(--color-neo-yellow)] text-black'
-                              : 'bg-white text-black hover:bg-zinc-100'
+                              ? 'border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)] text-[var(--lux-gold)]'
+                              : 'border-[var(--lux-border)] text-[var(--lux-soft)] hover:bg-[var(--lux-fill)] hover:text-[var(--lux-text)]'
                           }`}
                           title={dsp.starred ? 'Unpin from top' : 'Pin to top'}
                           aria-label={dsp.starred ? 'Unpin DSP' : 'Pin DSP to top'}
                         >
                           <Star
-                            className={`w-4 h-4 stroke-[3] ${dsp.starred ? 'fill-black' : ''}`}
+                            className={`w-4 h-4 stroke-[1.75] ${dsp.starred ? 'fill-current' : ''}`}
                           />
                         </button>
                         <span className="truncate">{dsp.name}</span>
                       </div>
                     )}
                     {stats.ongoingTasks > 0 && !isEditing && (
-                      <span className="flex items-center text-xs font-bold bg-[var(--color-neo-yellow)] text-black px-2 py-1 border-2 border-black rounded-md shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] shrink-0">
-                        <Activity className="w-3 h-3 mr-1 stroke-[3]" />
+                      <span className="flex shrink-0 items-center rounded-full border border-[var(--lux-amber-border)] bg-[var(--lux-amber-fill)] px-2.5 py-1 text-xs font-medium text-[var(--lux-amber)]">
+                        <Activity className="w-3 h-3 mr-1.5 stroke-[1.75]" />
                         {stats.ongoingTasks} Active
                       </span>
                     )}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 bg-white flex-1">
-                  <div className="flex flex-col gap-3 text-sm text-black font-medium">
+                <CardContent className="p-4 flex-1">
+                  <div className="flex flex-col gap-3 text-sm text-[var(--lux-muted)]">
                     <div className="flex items-center">
-                      <Clock className="w-5 h-5 mr-2 stroke-[2.5]" />
+                      <Clock className="w-4 h-4 mr-2.5 stroke-[1.75] text-[var(--lux-soft)]" />
                       Updated {formatDistanceToNow(dsp.updatedAt, { addSuffix: true })}
                     </div>
                     <div className="flex items-center">
-                      <BookOpenIcon className="w-5 h-5 mr-2 stroke-[2.5]" />
+                      <BookOpen className="w-4 h-4 mr-2.5 stroke-[1.75] text-[var(--lux-soft)]" />
                       {stats.totalLogs} total updates
                     </div>
                   </div>
                 </CardContent>
-                <CardFooter className="p-4 pt-0 bg-white flex gap-2 justify-end">
+                <CardFooter className="p-4 pt-0 flex gap-2 justify-end">
                   {isEditing ? (
                     <>
-                      <Button onClick={() => handleSaveName(dsp)} className="neo-btn bg-[var(--color-neo-green)] text-black px-3">
-                        <Save className="w-4 h-4 stroke-[3]" />
+                      <Button onClick={() => handleSaveName(dsp)} className="glass-btn glass-btn-emerald px-3">
+                        <Save className="w-4 h-4 stroke-[1.75]" />
                       </Button>
-                      <Button onClick={() => setEditingDspId(null)} className="neo-btn bg-zinc-200 text-black px-3">
-                        <X className="w-4 h-4 stroke-[3]" />
+                      <Button onClick={() => setEditingDspId(null)} className="glass-btn px-3">
+                        <X className="w-4 h-4 stroke-[1.75]" />
                       </Button>
                     </>
                   ) : (
                     <>
                       <Link to={`/logbook/${createDspSlug(dsp.name)}`}>
-                        <Button className="neo-btn bg-[var(--color-neo-cyan)] text-black">
+                        <Button className="glass-btn glass-btn-gold">
                           Open
                         </Button>
                       </Link>
-                      <Button onClick={() => handleEditClick(dsp)} className="neo-btn bg-[var(--color-neo-yellow)] text-black px-3" title="Edit DSP name">
-                        <Edit2 className="w-4 h-4 stroke-[3]" />
+                      <Button onClick={() => handleEditClick(dsp)} className="glass-btn px-3" title="Edit DSP name">
+                        <Edit2 className="w-4 h-4 stroke-[1.75]" />
                       </Button>
-                      <Button onClick={() => handleDeleteDsp(dsp)} className="neo-btn bg-red-500 text-white px-3" title="Delete DSP">
-                        <Trash2 className="w-4 h-4 stroke-[3]" />
+                      <Button onClick={() => handleDeleteDsp(dsp)} className="glass-btn glass-btn-ruby px-3" title="Delete DSP">
+                        <Trash2 className="w-4 h-4 stroke-[1.75]" />
                       </Button>
                     </>
                   )}
@@ -255,24 +261,4 @@ export default function Fleet() {
       )}
     </div>
   );
-}
-
-function BookOpenIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-    </svg>
-  )
 }

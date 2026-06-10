@@ -219,17 +219,17 @@ export default function RichMarkdownEditor({ value, onChange }: RichMarkdownEdit
 
   return (
     <div className="mt-5 flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap gap-2 border-b-3 border-black pb-3">
+      <div className="flex flex-wrap gap-2 border-b border-[var(--lux-border)] pb-3">
         {FORMAT_BUTTONS.map(({ command, title, icon: FormatIcon }) => (
           <Button
             key={command}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => applyFormat(command)}
-            className="neo-btn bg-zinc-100 px-3 text-black"
+            className="glass-btn h-9 px-3"
             title={title}
             aria-label={title}
           >
-            <FormatIcon className="h-4 w-4 stroke-[3]" />
+            <FormatIcon className="h-4 w-4 stroke-[1.75]" />
           </Button>
         ))}
       </div>
@@ -240,7 +240,7 @@ export default function RichMarkdownEditor({ value, onChange }: RichMarkdownEdit
         suppressContentEditableWarning
         onInput={syncMarkdown}
         onBlur={syncMarkdown}
-        className="rich-card-editor mt-4 overflow-y-auto rounded-lg border-3 border-black bg-white p-4 text-base leading-7 text-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:ring-2 focus:ring-black"
+        className="rich-card-editor glass-input mt-4 overflow-y-auto rounded-xl p-4 text-base leading-7"
       />
     </div>
   );

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { Activity, Check, CheckCircle2, ChevronDown, Clock, Plus, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
+import { Check, CheckCircle2, ChevronDown, Clock, Plus, Radio, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
+import EmptyState from '@/components/EmptyState';
 import { toast } from 'sonner';
 
 import { db, Log, Tag } from '@/lib/db';
@@ -285,27 +287,23 @@ export default function Watchtower() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-6 flex items-start gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl border-3 border-black bg-orange-500 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <Activity className="h-6 w-6 text-white stroke-[3]" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-3xl font-black uppercase tracking-tight text-black sm:text-4xl">Watchtower</h1>
-          <p className="mt-1 max-w-2xl text-sm font-medium text-zinc-600 sm:text-base">
-            Active monitoring tasks that need your attention. Choose which tags belong in Watchtower and the screen updates instantly.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={Radio}
+        title="Watchtower"
+        subtitle="Active monitoring tasks that need your attention. Choose which tags belong in Watchtower and the screen updates instantly."
+        compact
+        className="mb-6"
+      />
 
-      <Card className="neo-box mb-6 overflow-hidden border-3 bg-[var(--color-neo-surface)] p-0">
-        <CardHeader className="border-b-3 border-black bg-[var(--color-neo-surface-muted)] p-5">
+      <Card className="mb-6 overflow-hidden p-0">
+        <CardHeader className="border-b border-[var(--lux-border)] bg-[var(--lux-fill)] p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2 text-lg font-black uppercase text-black">
-                <SlidersHorizontal className="h-5 w-5 stroke-[3]" />
+              <CardTitle className="font-display flex items-center gap-2 text-lg font-semibold text-[var(--lux-text)]">
+                <SlidersHorizontal className="h-5 w-5 stroke-[1.75] text-[var(--lux-gold)]" />
                 Watchtower Visibility
               </CardTitle>
-              <p className="mt-2 max-w-2xl text-sm font-medium text-zinc-600">
+              <p className="mt-2 max-w-2xl text-sm text-[var(--lux-muted)]">
                 Only ongoing Bridge logs with the enabled tags appear in Watchtower. Everything else stays in the usual screens like Fleet and Logbook.
               </p>
             </div>
@@ -318,17 +316,16 @@ export default function Watchtower() {
                   setShowNewTagForm(false);
                 }}
                 className={cn(
-                  'neo-btn px-4 flex items-center gap-2',
-                  visibleTagIds.length > 0
-                    ? 'bg-[var(--color-neo-yellow)] text-black'
-                    : 'bg-[var(--color-neo-surface)] text-black'
+                  'glass-btn px-4 flex items-center gap-2',
+                  visibleTagIds.length > 0 &&
+                    'border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)] text-[var(--lux-gold)]'
                 )}
                 aria-haspopup="true"
                 aria-expanded={isFilterOpen}
               >
                 Filter Tags
                 <ChevronDown
-                  className={cn('h-4 w-4 stroke-[3] transition-transform', isFilterOpen && 'rotate-180')}
+                  className={cn('h-4 w-4 stroke-[1.75] transition-transform', isFilterOpen && 'rotate-180')}
                 />
               </Button>
 
@@ -345,11 +342,11 @@ export default function Watchtower() {
                       width: 'min(20rem, calc(100vw - 1rem))',
                       maxHeight: 'calc(100vh - 6rem)',
                     }}
-                    className="neo-box z-50 overflow-y-auto bg-[var(--color-neo-surface)] p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                    className="glass-strong z-50 overflow-y-auto rounded-2xl p-3"
                     role="dialog"
                     aria-label="Watchtower tag filters"
                   >
-                    <p className="px-1 pb-2 text-xs font-black uppercase tracking-widest text-black">
+                    <p className="lux-label px-1 pb-2">
                       Watchtower Tags
                     </p>
 
@@ -357,24 +354,24 @@ export default function Watchtower() {
                       <button
                         type="button"
                         onClick={handleSelectAllTags}
-                        className="flex-1 rounded-md border-2 border-black bg-white px-2 py-1 text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-[var(--color-neo-yellow)]"
+                        className="glass-btn flex-1 px-2 py-1.5 text-xs"
                       >
                         Select All
                       </button>
                       <button
                         type="button"
                         onClick={() => persistVisibleTagIds([])}
-                        className="flex-1 rounded-md border-2 border-black bg-white px-2 py-1 text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-zinc-200"
+                        className="glass-btn flex-1 px-2 py-1.5 text-xs"
                       >
                         Clear All
                       </button>
                     </div>
 
-                    <div className="my-2 border-t-2 border-black/20" />
+                    <div className="my-2 border-t border-[var(--lux-border)]" />
 
                     <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
                       {tags.length === 0 ? (
-                        <p className="px-2 py-3 text-center text-xs font-bold text-zinc-500">
+                        <p className="px-2 py-3 text-center text-xs text-[var(--lux-muted)]">
                           No tags yet. Create one below.
                         </p>
                       ) : (
@@ -384,39 +381,41 @@ export default function Watchtower() {
                             <div
                               key={tag.id}
                               className={cn(
-                                'group/tag-row flex w-full items-center gap-1 rounded-md border-2 border-transparent pr-1 transition-colors',
+                                'group/tag-row flex w-full items-center gap-1 rounded-lg border pr-1 transition-colors',
                                 checked
-                                  ? 'bg-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                                  : 'hover:bg-white/60'
+                                  ? 'border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)]'
+                                  : 'border-transparent hover:bg-[var(--lux-fill)]'
                               )}
                             >
                               <button
                                 type="button"
                                 onClick={() => handleToggleTag(tag.id)}
-                                className="flex flex-1 min-w-0 items-center justify-between gap-2 px-2 py-1.5 text-left text-sm font-bold"
+                                className="flex flex-1 min-w-0 items-center justify-between gap-2 px-2 py-1.5 text-left text-sm font-medium text-[var(--lux-text)]"
                               >
                                 <span className="flex items-center gap-2 truncate">
-                                  <span className={cn('h-3 w-3 shrink-0 rounded-full border border-black', tag.color)} />
+                                  <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', tag.color)} />
                                   <span className="truncate">{tag.name}</span>
                                 </span>
                                 <span
                                   className={cn(
-                                    'flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-black',
-                                    checked ? 'bg-[var(--color-neo-green)]' : 'bg-white'
+                                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border',
+                                    checked
+                                      ? 'border-[var(--lux-emerald-border)] bg-[var(--lux-emerald-fill)]'
+                                      : 'border-[var(--lux-border-strong)]'
                                   )}
                                   aria-hidden
                                 >
-                                  {checked && <Check className="h-3 w-3 stroke-[3] text-black" />}
+                                  {checked && <Check className="h-3 w-3 stroke-[2.5] text-[var(--lux-emerald)]" />}
                                 </span>
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleDeleteTag(tag)}
-                                className="shrink-0 rounded-md p-1 text-zinc-500 opacity-60 hover:bg-red-500 hover:text-white hover:opacity-100 group-hover/tag-row:opacity-100 focus-visible:opacity-100"
+                                className="shrink-0 rounded-md p-1 text-[var(--lux-soft)] opacity-60 transition-colors hover:bg-[var(--lux-ruby-fill)] hover:text-[var(--lux-ruby)] hover:opacity-100 group-hover/tag-row:opacity-100 focus-visible:opacity-100"
                                 title={`Delete tag "${tag.name}"`}
                                 aria-label={`Delete tag ${tag.name}`}
                               >
-                                <Trash2 className="h-3.5 w-3.5 stroke-[3]" />
+                                <Trash2 className="h-3.5 w-3.5 stroke-[1.75]" />
                               </button>
                             </div>
                           );
@@ -424,7 +423,7 @@ export default function Watchtower() {
                       )}
                     </div>
 
-                    <div className="my-2 border-t-2 border-black/20" />
+                    <div className="my-2 border-t border-[var(--lux-border)]" />
 
                     {showNewTagForm ? (
                       <div className="space-y-2 p-1">
@@ -440,10 +439,10 @@ export default function Watchtower() {
                           placeholder="New tag name"
                           autoFocus
                           maxLength={40}
-                          className="neo-input h-9 bg-white"
+                          className="h-9"
                         />
                         <div>
-                          <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-zinc-600">Color</p>
+                          <p className="lux-label mb-1.5 text-[10px]">Color</p>
                           <div className="flex flex-wrap gap-1.5">
                             {TAG_COLOR_PALETTE.map((color) => (
                               <button
@@ -451,10 +450,10 @@ export default function Watchtower() {
                                 type="button"
                                 onClick={() => setNewTagColor(color)}
                                 className={cn(
-                                  'h-6 w-6 rounded-md border-2 border-black transition-transform',
+                                  'h-6 w-6 rounded-full border border-[var(--lux-border-strong)] transition-transform',
                                   color,
                                   newTagColor === color
-                                    ? 'scale-110 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
+                                    ? 'scale-110 ring-2 ring-[var(--lux-gold-border)] ring-offset-1 ring-offset-transparent'
                                     : 'hover:scale-105'
                                 )}
                                 aria-label={`Pick color ${color.replace('bg-', '').replace('-500', '')}`}
@@ -467,7 +466,7 @@ export default function Watchtower() {
                             type="button"
                             onClick={handleCreateTag}
                             disabled={isCreatingTag || !newTagName.trim()}
-                            className="neo-btn flex-1 bg-[var(--color-neo-green)] text-black h-9"
+                            className="glass-btn glass-btn-gold flex-1 h-9"
                           >
                             {isCreatingTag ? 'Creating...' : 'Create Tag'}
                           </Button>
@@ -477,9 +476,9 @@ export default function Watchtower() {
                               setShowNewTagForm(false);
                               setNewTagName('');
                             }}
-                            className="neo-btn bg-zinc-200 text-black h-9 px-3"
+                            className="glass-btn h-9 px-3"
                           >
-                            <X className="h-4 w-4 stroke-[3]" />
+                            <X className="h-4 w-4 stroke-[1.75]" />
                           </Button>
                         </div>
                       </div>
@@ -487,9 +486,9 @@ export default function Watchtower() {
                       <button
                         type="button"
                         onClick={() => setShowNewTagForm(true)}
-                        className="flex w-full items-center justify-center gap-2 rounded-md border-2 border-dashed border-black bg-white px-2 py-2 text-xs font-black uppercase tracking-widest text-black hover:bg-[var(--color-neo-cyan)]"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--lux-border-strong)] px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--lux-muted)] transition-colors hover:border-[var(--lux-gold-border)] hover:text-[var(--lux-gold)]"
                       >
-                        <Plus className="h-4 w-4 stroke-[3]" />
+                        <Plus className="h-4 w-4 stroke-[1.75]" />
                         New Tag
                       </button>
                     )}
@@ -498,7 +497,7 @@ export default function Watchtower() {
                 document.body
               )}
 
-              <span className="rounded-lg border-2 border-black bg-[var(--color-neo-surface)] px-3 py-2 text-xs font-bold uppercase text-zinc-600 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+              <span className="glass-chip px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--lux-muted)]">
                 {filteredLogs.length} active item{filteredLogs.length === 1 ? '' : 's'}
               </span>
             </div>
@@ -506,14 +505,14 @@ export default function Watchtower() {
         </CardHeader>
         <CardContent className="p-5">
           <div className="space-y-2">
-            <p className="text-xs font-black uppercase text-zinc-600">
+            <p className="lux-label">
               {visibleTagIds.length === 0
                 ? 'No tags selected'
                 : `Showing items with any of ${visibleTagIds.length} selected tag${visibleTagIds.length === 1 ? '' : 's'}`}
             </p>
             <div className="flex flex-wrap gap-2">
               {visibleTagIds.length === 0 ? (
-                <span className="rounded-md border-2 border-dashed border-black bg-[var(--color-neo-surface)] px-3 py-2 text-sm font-bold text-zinc-600">
+                <span className="rounded-full border border-dashed border-[var(--lux-border-strong)] px-3 py-2 text-sm text-[var(--lux-muted)]">
                   Open Filter Tags to choose what appears here.
                 </span>
               ) : (
@@ -522,11 +521,9 @@ export default function Watchtower() {
                   .map((tag) => (
                     <span
                       key={tag.id}
-                      className={cn(
-                        'rounded-lg border-2 border-black px-3 py-2 text-xs font-black uppercase text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]',
-                        tag.color,
-                      )}
+                      className="glass-chip px-3 py-1.5 text-xs font-medium"
                     >
+                      <span className={cn('h-2 w-2 rounded-full', tag.color)} aria-hidden />
                       {tag.name}
                     </span>
                   ))
@@ -537,41 +534,42 @@ export default function Watchtower() {
       </Card>
 
       {filteredLogs.length === 0 ? (
-        <div className="neo-box bg-[var(--color-neo-surface)] py-20 text-center">
-          <CheckCircle2 className="mx-auto mb-4 h-16 w-16 text-[var(--color-neo-green)] stroke-[3]" />
-          <p className="text-xl font-black uppercase text-black">{emptyState.title}</p>
-          <p className="mx-auto mt-3 max-w-xl text-sm font-medium text-zinc-600">{emptyState.description}</p>
+        <EmptyState
+          icon={CheckCircle2}
+          title={emptyState.title}
+          description={emptyState.description}
+        >
           {!isShowingAllTags && ongoingLogs.length > 0 && (
-            <Button onClick={handleSelectAllTags} className="neo-btn mt-6 bg-[var(--color-neo-yellow)] text-black">
+            <Button onClick={handleSelectAllTags} className="glass-btn glass-btn-gold">
               Show All Tags
             </Button>
           )}
-        </div>
+        </EmptyState>
       ) : (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           {filteredLogs.map(log => (
-            <Card key={log.id} className="neo-box flex h-full flex-col overflow-hidden border-3 bg-[var(--color-neo-surface)] p-0">
-              <CardHeader className="border-b-3 border-black bg-[var(--color-neo-surface)] p-5">
+            <Card key={log.id} className="flex h-full flex-col overflow-hidden p-0">
+              <CardHeader className="border-b border-[var(--lux-border)] p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <CardTitle className="text-2xl font-black uppercase text-black">
-                      <Link to={`/logbook/${log.dspId}`} className="hover:underline">
+                    <CardTitle className="font-display text-2xl font-semibold text-[var(--lux-text)]">
+                      <Link to={`/logbook/${log.dspId}`} className="transition-colors hover:text-[var(--lux-gold)]">
                         {log.dspName}
                       </Link>
                     </CardTitle>
-                    <div className="mt-2 flex items-center text-sm font-medium text-zinc-600">
-                      <Clock className="mr-2 h-4 w-4 stroke-[2.5]" />
+                    <div className="mt-2 flex items-center text-sm text-[var(--lux-muted)]">
+                      <Clock className="mr-2 h-4 w-4 stroke-[1.75] text-[var(--lux-soft)]" />
                       Started {formatDistanceToNow(log.createdAt, { addSuffix: true })}
                     </div>
                   </div>
-                  <span className="rounded-md border-2 border-black bg-orange-200 px-3 py-1 text-xs font-bold uppercase text-orange-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                  <span className="rounded-full border border-[var(--lux-amber-border)] bg-[var(--lux-amber-fill)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--lux-amber)]">
                     Ongoing
                   </span>
                 </div>
               </CardHeader>
 
               <CardContent className="flex-1 space-y-4 p-5">
-                <p className="whitespace-pre-wrap text-base font-medium leading-7 text-black">
+                <p className="whitespace-pre-wrap text-[15px] leading-7 text-[var(--lux-text)]">
                   {log.content}
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -581,11 +579,9 @@ export default function Watchtower() {
                     return (
                       <span
                         key={tag.id}
-                        className={cn(
-                          'rounded-md border-2 border-black px-2 py-1 text-xs font-bold uppercase text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]',
-                          tag.color,
-                        )}
+                        className="glass-chip px-2.5 py-1 text-xs font-medium"
                       >
+                        <span className={cn('h-2 w-2 rounded-full', tag.color)} aria-hidden />
                         {tag.name}
                       </span>
                     );
@@ -594,37 +590,37 @@ export default function Watchtower() {
               </CardContent>
 
               {resolvingId === log.id && (
-                <div className="space-y-4 border-t-3 border-black bg-[var(--color-neo-surface-muted)] p-5">
-                  <h4 className="font-black uppercase text-black">Resolution Details</h4>
-                  <Textarea 
+                <div className="space-y-4 border-t border-[var(--lux-border)] bg-[var(--lux-fill)] p-5">
+                  <h4 className="lux-label">Resolution Details</h4>
+                  <Textarea
                     placeholder="Add notes about how this was resolved..."
-                    className="neo-input min-h-[120px] bg-[var(--color-neo-surface)]"
+                    className="min-h-[120px]"
                     value={resolutionNote}
                     onChange={(event) => setResolutionNote(event.target.value)}
                   />
-                  
+
                   <div className="flex flex-wrap items-center gap-3">
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      className="hidden" 
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
                       onChange={handleFileChange}
                       accept="image/*,.pdf,.doc,.docx"
                     />
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => fileInputRef.current?.click()}
-                      className="neo-btn bg-[var(--color-neo-surface)]"
+                      className="glass-btn"
                     >
-                      <Upload className="mr-2 h-4 w-4 stroke-[3]" />
+                      <Upload className="mr-2 h-4 w-4 stroke-[1.75]" />
                       Attach File
                     </Button>
-                    
+
                     {resolutionFile && (
-                      <div className="flex items-center gap-2 rounded-md border-2 border-black bg-[var(--color-neo-yellow)] px-3 py-2 text-sm font-bold text-black">
+                      <div className="flex items-center gap-2 rounded-full border border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)] px-3 py-2 text-sm font-medium text-[var(--lux-text)]">
                         <span className="max-w-[180px] truncate">{resolutionFile.name}</span>
-                        <button type="button" onClick={() => setResolutionFile(null)} className="hover:text-red-600">
-                          <X className="h-4 w-4 stroke-[3]" />
+                        <button type="button" onClick={() => setResolutionFile(null)} className="transition-colors hover:text-[var(--lux-ruby)]">
+                          <X className="h-4 w-4 stroke-[1.75]" />
                         </button>
                       </div>
                     )}
@@ -632,21 +628,21 @@ export default function Watchtower() {
                 </div>
               )}
 
-              <CardFooter className="border-t-3 border-black bg-[var(--color-neo-surface)] p-5">
+              <CardFooter className="border-t border-[var(--lux-border)] p-5">
                 <div className="flex w-full flex-col-reverse gap-3 sm:flex-row">
                   {resolvingId === log.id && (
-                    <Button 
-                      className="neo-btn flex-1 bg-[var(--color-neo-surface-muted)] text-black" 
+                    <Button
+                      className="glass-btn flex-1"
                       onClick={() => setResolvingId(null)}
                     >
                       Cancel
                     </Button>
                   )}
-                  <Button 
-                    className="neo-btn flex-1 bg-[var(--color-neo-green)] text-black" 
+                  <Button
+                    className="glass-btn glass-btn-emerald flex-1"
                     onClick={() => handleResolve(log.id)}
                   >
-                    <CheckCircle2 className="mr-2 h-5 w-5 stroke-[3]" /> 
+                    <CheckCircle2 className="mr-2 h-5 w-5 stroke-[1.75]" />
                     {resolvingId === log.id ? 'Confirm Resolution' : 'Mark Resolved'}
                   </Button>
                 </div>

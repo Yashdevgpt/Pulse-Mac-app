@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Check, X, ShieldAlert, Shield, ShieldOff, Edit2, Save, Trash2, KeyRound, Eye, EyeOff } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
 import { auth } from '@/lib/firebase';
 import { getAiKeys, saveAiKeysEverywhere, clearAiKeysEverywhere } from '@/lib/aiKeys';
 
@@ -132,142 +133,146 @@ export default function Admin() {
   };
 
   if (loading) {
-    return <div className="px-4 py-6 font-bold sm:px-6 lg:px-8">Loading users...</div>;
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center px-4">
+        <div className="flex animate-pulse flex-col items-center">
+          <ShieldAlert className="mb-4 h-12 w-12 stroke-[1.75] text-[var(--lux-gold)]" />
+          <p className="lux-label">Loading users...</p>
+        </div>
+      </div>
+    );
   }
 
   const currentUserId = auth.currentUser?.uid;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-8 flex items-center gap-4">
-        <div className="w-12 h-12 bg-[var(--color-neo-yellow)] border-3 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-xl flex items-center justify-center">
-          <ShieldAlert className="w-6 h-6 text-black stroke-[3]" />
-        </div>
-        <div>
-          <h1 className="text-4xl font-black text-black tracking-tight uppercase">Admin Panel</h1>
-          <p className="text-zinc-600 mt-1 font-medium">Manage user access to Pulse.</p>
-        </div>
-      </div>
+      <PageHeader
+        icon={ShieldAlert}
+        title="Admin Panel"
+        subtitle="Manage user access to Pulse."
+        compact
+      />
 
-      <div className="neo-box p-6 bg-white space-y-5 mb-8">
+      <div className="glass-panel p-6 space-y-5 mb-8">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[var(--color-neo-violet)] border-3 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] rounded-lg flex items-center justify-center">
-            <KeyRound className="w-5 h-5 text-black stroke-[3]" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)]">
+            <KeyRound className="w-5 h-5 stroke-[1.75] text-[var(--lux-gold)]" />
           </div>
           <div>
-            <h2 className="text-2xl font-black uppercase text-black">AI Keys</h2>
-            <p className="text-sm text-zinc-600 font-medium">
+            <h2 className="font-display text-2xl font-semibold text-[var(--lux-text)]">AI Keys</h2>
+            <p className="text-sm text-[var(--lux-muted)]">
               Stored only on this Mac (a private file in Pulse's app data — survives restarts). Brain calls Gemini first; on rate limit or auth error it falls back to OpenRouter (DeepSeek Chat, then GPT-OSS-120B). One OpenRouter key covers both fallback models.
             </p>
           </div>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-bold uppercase text-black tracking-wide">Gemini API Key</label>
+          <label className="lux-label">Gemini API Key</label>
           <div className="flex gap-2">
             <Input
               type={showGemini ? 'text' : 'password'}
               value={geminiKeyInput}
               onChange={(event) => setGeminiKeyInput(event.target.value)}
               placeholder="AIza..."
-              className="neo-input"
+              className=""
               spellCheck={false}
               autoComplete="off"
             />
             <Button
               type="button"
               onClick={() => setShowGemini((value) => !value)}
-              className="neo-btn bg-zinc-200 text-black px-3"
+              className="glass-btn px-3"
               title={showGemini ? 'Hide key' : 'Show key'}
             >
-              {showGemini ? <EyeOff className="w-4 h-4 stroke-[3]" /> : <Eye className="w-4 h-4 stroke-[3]" />}
+              {showGemini ? <EyeOff className="w-4 h-4 stroke-[1.75]" /> : <Eye className="w-4 h-4 stroke-[1.75]" />}
             </Button>
           </div>
-          <p className="text-xs text-zinc-500 font-medium">{maskedHint(getAiKeys().geminiKey)} · Get one at aistudio.google.com/apikey</p>
+          <p className="text-xs text-[var(--lux-muted)] font-medium">{maskedHint(getAiKeys().geminiKey)} · Get one at aistudio.google.com/apikey</p>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-bold uppercase text-black tracking-wide">OpenRouter API Key</label>
+          <label className="lux-label">OpenRouter API Key</label>
           <div className="flex gap-2">
             <Input
               type={showOpenrouter ? 'text' : 'password'}
               value={openrouterKeyInput}
               onChange={(event) => setOpenrouterKeyInput(event.target.value)}
               placeholder="sk-or-..."
-              className="neo-input"
+              className=""
               spellCheck={false}
               autoComplete="off"
             />
             <Button
               type="button"
               onClick={() => setShowOpenrouter((value) => !value)}
-              className="neo-btn bg-zinc-200 text-black px-3"
+              className="glass-btn px-3"
               title={showOpenrouter ? 'Hide key' : 'Show key'}
             >
-              {showOpenrouter ? <EyeOff className="w-4 h-4 stroke-[3]" /> : <Eye className="w-4 h-4 stroke-[3]" />}
+              {showOpenrouter ? <EyeOff className="w-4 h-4 stroke-[1.75]" /> : <Eye className="w-4 h-4 stroke-[1.75]" />}
             </Button>
           </div>
-          <p className="text-xs text-zinc-500 font-medium">{maskedHint(getAiKeys().openrouterKey)} · Get one at openrouter.ai/keys · Fallback chain: deepseek/deepseek-chat → openai/gpt-oss-120b</p>
+          <p className="text-xs text-[var(--lux-muted)] font-medium">{maskedHint(getAiKeys().openrouterKey)} · Get one at openrouter.ai/keys · Fallback chain: deepseek/deepseek-chat → openai/gpt-oss-120b</p>
         </div>
 
         <div className="flex flex-wrap gap-3 pt-2">
-          <Button onClick={handleSaveKeys} className="neo-btn bg-[var(--color-neo-green)] text-black">
-            <Save className="w-4 h-4 mr-2 stroke-[3]" /> Save Keys
+          <Button onClick={handleSaveKeys} className="glass-btn glass-btn-gold">
+            <Save className="w-4 h-4 mr-2 stroke-[1.75]" /> Save Keys
           </Button>
-          <Button onClick={handleClearKeys} className="neo-btn bg-zinc-200 text-black hover:bg-red-500 hover:text-white transition-colors">
-            <Trash2 className="w-4 h-4 mr-2 stroke-[3]" /> Clear
+          <Button onClick={handleClearKeys} className="glass-btn glass-btn-ruby">
+            <Trash2 className="w-4 h-4 mr-2 stroke-[1.75]" /> Clear
           </Button>
           {keysSavedAt && (
-            <span className="text-xs text-zinc-500 font-medium self-center">Saved at {new Date(keysSavedAt).toLocaleTimeString()}</span>
+            <span className="text-xs text-[var(--lux-muted)] font-medium self-center">Saved at {new Date(keysSavedAt).toLocaleTimeString()}</span>
           )}
         </div>
       </div>
 
-      <div className="neo-box p-6 bg-white space-y-4">
+      <div className="glass-panel p-6 space-y-4">
         {users.length === 0 ? (
-          <p className="text-zinc-500 font-medium">No users found.</p>
+          <p className="text-[var(--lux-muted)]">No users found.</p>
         ) : (
           <div className="space-y-4">
             {users.map(user => (
-              <div key={user.uid} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border-3 border-black rounded-xl bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] gap-4">
+              <div key={user.uid} className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-2xl border border-[var(--lux-border)] bg-[var(--lux-fill)] p-4 gap-4">
                 <div className="w-full sm:w-auto flex-1">
                   {editingUserId === user.uid ? (
                     <div className="flex items-center gap-2 mb-2">
-                      <Input 
-                        value={editName} 
+                      <Input
+                        value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="neo-input h-8 text-sm max-w-[200px]"
+                        className="h-8 text-sm max-w-[200px]"
                         autoFocus
                       />
-                      <Button size="sm" onClick={() => handleSaveName(user.uid)} className="neo-btn bg-[var(--color-neo-green)] h-8 px-2">
-                        <Save className="w-4 h-4" />
+                      <Button size="sm" onClick={() => handleSaveName(user.uid)} className="glass-btn glass-btn-emerald h-8 px-2">
+                        <Save className="w-4 h-4 stroke-[1.75]" />
                       </Button>
-                      <Button size="sm" onClick={() => setEditingUserId(null)} className="neo-btn bg-zinc-200 h-8 px-2">
-                        <X className="w-4 h-4" />
+                      <Button size="sm" onClick={() => setEditingUserId(null)} className="glass-btn h-8 px-2">
+                        <X className="w-4 h-4 stroke-[1.75]" />
                       </Button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-bold text-lg text-black">{user.name || 'Unknown'}</p>
-                      <button 
+                      <p className="font-display font-semibold text-lg text-[var(--lux-text)]">{user.name || 'Unknown'}</p>
+                      <button
                         onClick={() => {
                           setEditingUserId(user.uid);
                           setEditName(user.name || '');
                         }}
-                        className="text-zinc-400 hover:text-black transition-colors"
+                        className="text-[var(--lux-soft)] hover:text-[var(--lux-gold)] transition-colors"
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <Edit2 className="w-4 h-4 stroke-[1.75]" />
                       </button>
                     </div>
                   )}
-                  
-                  <p className="text-sm text-zinc-600 font-medium">{user.email}</p>
+
+                  <p className="text-sm text-[var(--lux-muted)]">{user.email}</p>
                   <div className="mt-2">
-                    <span className={`text-xs font-bold px-2 py-1 border-2 border-black rounded-md shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
-                      user.status === 'admin' ? 'bg-[var(--color-neo-violet)] text-black' :
-                      user.status === 'approved' ? 'bg-[var(--color-neo-green)] text-black' :
-                      user.status === 'rejected' ? 'bg-red-500 text-white' :
-                      'bg-[var(--color-neo-yellow)] text-black'
+                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                      user.status === 'admin' ? 'border-[var(--lux-gold-border)] bg-[var(--lux-gold-fill)] text-[var(--lux-gold)]' :
+                      user.status === 'approved' ? 'border-[var(--lux-emerald-border)] bg-[var(--lux-emerald-fill)] text-[var(--lux-emerald)]' :
+                      user.status === 'rejected' ? 'border-[var(--lux-ruby-border)] bg-[var(--lux-ruby-fill)] text-[var(--lux-ruby)]' :
+                      'border-[var(--lux-amber-border)] bg-[var(--lux-amber-fill)] text-[var(--lux-amber)]'
                     }`}>
                       {user.status.toUpperCase()}
                     </span>
@@ -277,38 +282,38 @@ export default function Admin() {
                 <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
                   {user.status === 'pending' && (
                     <>
-                      <Button onClick={() => handleApprove(user.uid)} className="neo-btn bg-[var(--color-neo-green)] text-black">
-                        <Check className="w-4 h-4 mr-2 stroke-[3]" /> Approve
+                      <Button onClick={() => handleApprove(user.uid)} className="glass-btn glass-btn-emerald">
+                        <Check className="w-4 h-4 mr-2 stroke-[1.75]" /> Approve
                       </Button>
-                      <Button onClick={() => handleReject(user.uid)} className="neo-btn bg-red-500 text-white hover:bg-red-600">
-                        <X className="w-4 h-4 mr-2 stroke-[3]" /> Reject
+                      <Button onClick={() => handleReject(user.uid)} className="glass-btn glass-btn-ruby">
+                        <X className="w-4 h-4 mr-2 stroke-[1.75]" /> Reject
                       </Button>
                     </>
                   )}
                   {user.status === 'approved' && (
                     <>
-                      <Button onClick={() => handleMakeAdmin(user.uid)} className="neo-btn bg-[var(--color-neo-yellow)] text-black">
-                        <Shield className="w-4 h-4 mr-2 stroke-[3]" /> Make Admin
+                      <Button onClick={() => handleMakeAdmin(user.uid)} className="glass-btn glass-btn-gold">
+                        <Shield className="w-4 h-4 mr-2 stroke-[1.75]" /> Make Admin
                       </Button>
-                      <Button onClick={() => handleReject(user.uid)} className="neo-btn bg-red-500 text-white hover:bg-red-600">
-                        <X className="w-4 h-4 mr-2 stroke-[3]" /> Revoke
+                      <Button onClick={() => handleReject(user.uid)} className="glass-btn glass-btn-ruby">
+                        <X className="w-4 h-4 mr-2 stroke-[1.75]" /> Revoke
                       </Button>
                     </>
                   )}
                   {user.status === 'rejected' && (
-                    <Button onClick={() => handleApprove(user.uid)} className="neo-btn bg-[var(--color-neo-green)] text-black">
-                      <Check className="w-4 h-4 mr-2 stroke-[3]" /> Re-Approve
+                    <Button onClick={() => handleApprove(user.uid)} className="glass-btn glass-btn-emerald">
+                      <Check className="w-4 h-4 mr-2 stroke-[1.75]" /> Re-Approve
                     </Button>
                   )}
                   {user.status === 'admin' && user.uid !== currentUserId && (
-                    <Button onClick={() => handleApprove(user.uid)} className="neo-btn bg-zinc-200 text-black hover:bg-zinc-300">
-                      <ShieldOff className="w-4 h-4 mr-2 stroke-[3]" /> Remove Admin
+                    <Button onClick={() => handleApprove(user.uid)} className="glass-btn">
+                      <ShieldOff className="w-4 h-4 mr-2 stroke-[1.75]" /> Remove Admin
                     </Button>
                   )}
-                  
+
                   {user.uid !== currentUserId && (
-                    <Button onClick={() => setUserToDelete(user.uid)} className="neo-btn bg-zinc-200 text-black hover:bg-red-500 hover:text-white px-3 transition-colors" title="Delete User">
-                      <Trash2 className="w-4 h-4 stroke-[3]" />
+                    <Button onClick={() => setUserToDelete(user.uid)} className="glass-btn glass-btn-ruby px-3" title="Delete User">
+                      <Trash2 className="w-4 h-4 stroke-[1.75]" />
                     </Button>
                   )}
                 </div>
@@ -319,13 +324,13 @@ export default function Admin() {
       </div>
 
       {userToDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="neo-box bg-white p-6 max-w-sm w-full space-y-6">
-            <h2 className="text-2xl font-black uppercase text-black">Confirm Deletion</h2>
-            <p className="text-zinc-600 font-medium">Are you sure you want to delete this user? This action cannot be undone.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="glass-strong w-full max-w-sm space-y-6 rounded-2xl p-6">
+            <h2 className="font-display text-2xl font-semibold text-[var(--lux-text)]">Confirm Deletion</h2>
+            <p className="text-[var(--lux-muted)]">Are you sure you want to delete this user? This action cannot be undone.</p>
             <div className="flex gap-4">
-              <Button onClick={() => setUserToDelete(null)} className="neo-btn bg-zinc-200 text-black flex-1">Cancel</Button>
-              <Button onClick={() => confirmDelete(userToDelete)} className="neo-btn bg-red-500 text-white flex-1">Delete</Button>
+              <Button onClick={() => setUserToDelete(null)} className="glass-btn flex-1">Cancel</Button>
+              <Button onClick={() => confirmDelete(userToDelete)} className="glass-btn glass-btn-ruby flex-1">Delete</Button>
             </div>
           </div>
         </div>

@@ -10,9 +10,9 @@ function Badge({ className, variant = "default", ...props }: BadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold",
-        variant === "default" && "bg-primary text-primary-foreground",
-        variant === "outline" && "border border-input bg-background text-foreground",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
+        variant === "default" && "border border-[var(--lux-border)] bg-[var(--lux-fill)] text-[var(--lux-text)]",
+        variant === "outline" && "border border-[var(--lux-border-strong)] bg-transparent text-[var(--lux-muted)]",
         className
       )}
       {...props}
